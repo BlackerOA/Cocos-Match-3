@@ -16,6 +16,10 @@ cc.Class({
     audioSource: { 
       default: null, // 設置默認值
       type: cc.AudioSource
+    },
+    goalLabel: {
+      default: null,
+      type: cc.Node
     }
   },
 
@@ -33,6 +37,7 @@ cc.Class({
     gridScript.setController(this);
     gridScript.initWithCellModels(this.gameModel.getCells());
     this.audioSource = cc.find('Canvas/GameScene')._components[1].audio;
+    this.goalLabel = cc.find("Canvas/Goals/Goal1/Goal Left");
   },
 
   callback: function () {
@@ -48,8 +53,13 @@ cc.Class({
     this.gameModel.cleanCmd();
   },
 
-  getGameModel() {
+  getGameModel: function () {
     console.log("getGameModel called");
     return this.gameModel;
+  },
+
+  minusGoalLeftLabel: function() {
+    console.log("controller minus called");
+    goalLabel.minusGoalLeftLabel();
   }
 });

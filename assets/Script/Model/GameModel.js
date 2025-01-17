@@ -11,6 +11,9 @@ export default class GameModel {
     this.cellCreateType = []; // 升成种类只在这个数组里面查找
     this.movesLeft = 10;
     this.isGameOver = false;
+
+    this.goalType = CELL_TYPE.EMPTY; // 不指定
+    this.goalStatus = CELL_STATUS.COMMON; // 不指定
     this.goalLeft = 87;
   }
 

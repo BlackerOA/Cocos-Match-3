@@ -14,7 +14,7 @@ cc.Class({
     onLoad() {
         this.label = this.getComponent(cc.Label);
     },
-
+/*
     start () {
         if (!this.gameScene) {
             this.gameScene = cc.find("Canvas/GameScene");
@@ -37,5 +37,10 @@ cc.Class({
         if (this.gameModel) {
             this.label.string =  this.gameModel.goalLeft;
         }
+    },
+*/
+    minusGoalLeft: function() {
+        console.log("label update");
+        this.label.string = Math.max(0, this.label.string - 1);
     }
 });

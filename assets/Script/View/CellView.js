@@ -1,4 +1,5 @@
 import {CELL_STATUS, CELL_WIDTH, CELL_HEIGHT, ANITIME} from '../Model/ConstValue';
+import GameController from '../Controller/GameController';
 
 cc.Class({
     extends: cc.Component,
@@ -17,6 +18,10 @@ cc.Class({
         defaultFrame:{
             default: null,
             type: cc.SpriteFrame
+        },
+        gameController: {
+            default: null,
+            type: cc._JavaScript
         }
     },
 
@@ -24,6 +29,17 @@ cc.Class({
     onLoad: function () {
         //this.model = null;
         this.isSelect = false;
+
+        this.gameController = cc.find("Canvas/GameScene").getComponent(GameController);
+        if (!this.gameController) {
+            console.error("GameController not found on gameScene.");
+            return;
+        }
+        try {
+            this.gameController.minusGoalLeftLabel(); //test
+        } catch (e) {
+            console.error("Error calling minusGoalLeftLabel:", e);
+        }
     },
     initWithModel: function(model){
         this.model = model;
@@ -59,6 +75,7 @@ cc.Class({
                 actionArray.push(move);
             }
             else if(cmd[i].action == "toDie"){
+                this.gameController.minusGoalLeftLabel();
                 if(this.status == CELL_STATUS.BIRD){
                     let animation = this.node.getComponent(cc.Animation);
                     animation.play("effect");
@@ -87,9 +104,7 @@ cc.Class({
             }
             curTime = cmd[i].playTime + cmd[i].keepTime;
         }
-        /**
-         * 智障的引擎设计，一群SB
-         */
+        
         if(actionArray.length == 1){
             this.node.runAction(actionArray[0]);
         }
