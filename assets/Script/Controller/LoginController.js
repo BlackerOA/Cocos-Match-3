@@ -30,6 +30,7 @@ cc.Class({
 
   onLoad() {
     this.gameSceneBGMAudioId = cc.audioEngine.play(this.worldSceneBGM, true, 1);
+    this.preloadFirebase();
     
     // 設置登錄按鈕事件
     if (this.loginButton) {
@@ -48,6 +49,25 @@ cc.Class({
       this.playerIdInput.node.on('text-changed', this.onPlayerIdChanged, this);
       // 確保輸入框初始為空
       this.playerIdInput.string = "";
+    }
+  },
+
+  preloadFirebase() {
+    console.log("預加載 Firebase 腳本...");
+    
+    // 嘗試從全局訪問 firebase
+    if (typeof firebase !== 'undefined') {
+        console.log("Firebase 已全局加載");
+        return;
+    }
+    
+    try {
+        // 嘗試直接要求 firebase
+        window.firebase = require('../lib/firebase-app.js');
+        require('../lib/firebase-firestore.js');
+        console.log("Firebase 腳本已成功加載!");
+    } catch (error) {
+        console.error("Firebase 腳本加載失敗:", error);
     }
   },
   

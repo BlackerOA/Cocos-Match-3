@@ -1,5 +1,6 @@
 const Toast = require('../Utils/Toast');
 const GlobalData = require("../Utils/GlobalData");
+const FirebaseConfig = require('../Utils/FirebaseConfig');
 
 cc.Class({
     extends: cc.Component,
@@ -32,14 +33,56 @@ cc.Class({
         this.currentPlayerId = "";
         this.pendingScores = [];
         
+        // 初始化 Firebase
+        this.initFirebase();
+        
         // 從本地讀取排行榜數據
         this.loadLocalLeaderboard();
         
         // 讀取待上傳的分數
         this.loadPendingScores();
-        
-        // 檢查連接狀態
-        this.checkConnection();
+    },
+
+    loadFirebaseScript(callback) {
+        try {
+            console.log("Firebase 腳本應該已經通過本地加載");
+            callback && callback();
+        } catch (error) {
+            console.error("Firebase 腳本加載錯誤:", error);
+            this.isOfflineMode = true;
+        }
+    },
+
+    initFirebase() {
+        try {
+            if (typeof firebase === 'undefined') {
+                console.error("Firebase 未定義，可能未正確加載");
+                this.isOfflineMode = true;
+                return;
+            }
+            
+            if (!firebase.apps || !firebase.apps.length) {
+                firebase.initializeApp(FirebaseConfig);
+            }
+            
+            if (firebase.firestore) {
+                this.db = firebase.firestore();
+                this.leaderboardCollection = this.db.collection('leaderboard');
+                console.log("Firebase Firestore 初始化成功");
+                
+                // 檢查連接狀態
+                this.checkConnection();
+                
+                // 嘗試上傳待處理的分數
+                this.uploadPendingScores();
+            } else {
+                console.error("Firebase Firestore 模組未加載");
+                this.isOfflineMode = true;
+            }
+        } catch (error) {
+            console.error("Firebase 初始化錯誤:", error);
+            this.isOfflineMode = true;
+        }
     },
     
     start() {
@@ -49,39 +92,27 @@ cc.Class({
 
     // 檢查服務器連接
     checkConnection() {
-      let self = this;
-      let xhr = new XMLHttpRequest();
-      xhr.timeout = this.connectionTimeout * 1000;
-      
-      xhr.onreadystatechange = function() {
-          if (xhr.readyState === 4) {
-              if (xhr.status >= 200 && xhr.status < 300) {
-                  console.log("排行榜服務連接正常");
-                  self.isOfflineMode = false;
-              } else {
-                  console.warn("排行榜服務連接失敗，狀態碼：", xhr.status);
-                  self.isOfflineMode = true;
-              }
-          }
-      };
-      
-      xhr.onerror = function() {
-          console.error("排行榜服務連接錯誤");
-          self.isOfflineMode = true;
-      };
-      
-      xhr.ontimeout = function() {
-          console.error("排行榜服務連接超時");
-          self.isOfflineMode = true;
-      };
-      
-      try {
-          xhr.open("GET", this.serverUrl + "/health", true);
-          xhr.send();
-      } catch (e) {
-          console.error("發送連接請求時出錯：", e);
-          this.isOfflineMode = true;
-      }
+        try {
+            if (!this.db) {
+                console.warn("Firebase 尚未初始化，連線狀態未知");
+                this.isOfflineMode = true;
+                return;
+            }
+            
+            // 使用 Firestore 連接狀態確認
+            this.db.enableNetwork()
+                .then(() => {
+                    console.log("排行榜服務連接正常");
+                    this.isOfflineMode = false;
+                })
+                .catch(error => {
+                    console.error("排行榜服務連接錯誤:", error);
+                    this.isOfflineMode = true;
+                });
+        } catch (error) {
+            console.error("連接狀態檢查錯誤:", error);
+            this.isOfflineMode = true;
+        }
     },
     
     // 獲取排行榜數據
@@ -100,64 +131,42 @@ cc.Class({
             return;
         }
         
-        let self = this;
-        let retryCount = 0;
+        // 檢查 Firebase 是否已初始化
+        if (!this.db) {
+            this.isLoading = false;
+            if (callback) callback(new Error("Firebase 尚未初始化"), this.localLeaderboardData);
+            return;
+        }
+
+        // 在連接 Firestore 前檢查
+        if (!this.db || !this.leaderboardCollection) {
+            console.error("Firebase Firestore 未初始化");
+            this.isOfflineMode = true;
+            this.isLoading = false;
+            if (callback) callback(new Error("Firebase 尚未初始化"), this.localLeaderboardData);
+            return;
+        }
         
-        const fetchLeaderboard = () => {
-            let xhr = new XMLHttpRequest();
-            xhr.timeout = this.connectionTimeout * 1000;
-            
-            // 添加時間戳和隨機參數避免快取
-            let url = this.serverUrl + "/leaderboard";
-            if (forceRefresh) {
-                url += "?t=" + Date.now() + "&nocache=" + Math.random();
-            }
-            
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        try {
-                            let response = JSON.parse(xhr.responseText);
-                            if (response && response.data) {
-                                self.leaderboardData = response.data;
-                                self.saveLocalLeaderboard(response.data);
-                                self.isLoading = false;
-                                if (callback) callback(null, response.data);
-                            } else {
-                                throw new Error("服務器返回數據格式無效");
-                            }
-                        } catch (e) {
-                            console.error("解析排行榜數據時出錯：", e);
-                            self.retryOrFallback(fetchLeaderboard, callback, retryCount++, e);
-                        }
-                    } else {
-                        console.warn("獲取排行榜失敗，狀態碼：", xhr.status);
-                        self.retryOrFallback(fetchLeaderboard, callback, retryCount++, new Error("服務器錯誤：" + xhr.status));
-                    }
-                }
-            };
-            
-            xhr.onerror = function() {
-                console.error("獲取排行榜時網絡錯誤");
-                self.retryOrFallback(fetchLeaderboard, callback, retryCount++, new Error("網絡連接錯誤"));
-            };
-            
-            xhr.ontimeout = function() {
-                console.error("獲取排行榜超時");
-                self.retryOrFallback(fetchLeaderboard, callback, retryCount++, new Error("請求超時"));
-            };
-            
-            try {
-                xhr.open("GET", url, true);
-                xhr.setRequestHeader("Cache-Control", "no-cache");
-                xhr.send();
-            } catch (e) {
-                console.error("發送獲取排行榜請求時出錯：", e);
-                self.retryOrFallback(fetchLeaderboard, callback, retryCount++, e);
-            }
-        };
-        
-        fetchLeaderboard();
+        // 從 Firestore 獲取排行榜數據
+        this.leaderboardCollection.orderBy("score", "desc")
+            .limit(this.maxEntries)
+            .get()
+            .then(querySnapshot => {
+                let leaderboardData = [];
+                querySnapshot.forEach(doc => {
+                    leaderboardData.push(doc.data());
+                });
+                this.leaderboardData = leaderboardData;
+                this.saveLocalLeaderboard(leaderboardData);
+                this.isLoading = false;
+                if (callback) callback(null, leaderboardData);
+            })
+            .catch(error => {
+                console.error("獲取排行榜數據失敗:", error);
+                this.isOfflineMode = true;
+                this.isLoading = false;
+                if (callback) callback(error, this.localLeaderboardData);
+            });
     },
     
     // 重試或切換到本地模式
@@ -175,85 +184,77 @@ cc.Class({
 
     // 添加分數到排行榜
     addScore(playerId, score, callback) {
-      this.currentPlayerId = playerId;
-      
-      // 先更新本地排行榜，確保有資料可顯示
-      this.addScoreLocally(playerId, score);
-      
-      // 如果是離線模式，加入待上傳隊列
-      if (this.isOfflineMode) {
-          this.addToPendingScores(playerId, score);
-          let rank = this.getPlayerRank(playerId);
-          if (callback) callback(new Error("離線模式"), { rank: rank });
-          return rank;
-      }
-      
-      let self = this;
-      let xhr = new XMLHttpRequest();
-      xhr.timeout = this.connectionTimeout * 1000;
-      let retryCount = 0;
-      
-      const sendScore = () => {
-          xhr.onreadystatechange = function() {
-              if (xhr.readyState === 4) {
-                  if (xhr.status >= 200 && xhr.status < 300) {
-                      try {
-                          let response = JSON.parse(xhr.responseText);
-                          console.log("分數上傳成功，服務器返回：", response);
-                          
-                          // 上傳成功後更新排行榜
-                          self.getLeaderboard((err, data) => {
-                              if (!err && data) {
-                                  let rank = self.getPlayerRank(playerId);
-                                  if (callback) callback(null, { rank: rank });
-                              } else {
-                                  // 如果獲取排行榜失敗，使用本地排名
-                                  let rank = self.getPlayerRank(playerId);
-                                  if (callback) callback(new Error("獲取最新排行榜失敗"), { rank: rank });
-                              }
-                          }, true);
-                      } catch (e) {
-                          console.error("解析上傳分數響應時出錯：", e);
-                          self.scoreRetryOrFallback(playerId, score, sendScore, callback, retryCount++, e);
-                      }
-                  } else {
-                      console.warn("上傳分數失敗，狀態碼：", xhr.status);
-                      self.scoreRetryOrFallback(playerId, score, sendScore, callback, retryCount++, new Error("服務器錯誤：" + xhr.status));
-                  }
-              }
-          };
-          
-          xhr.onerror = function() {
-              console.error("上傳分數時網絡錯誤");
-              self.scoreRetryOrFallback(playerId, score, sendScore, callback, retryCount++, new Error("網絡連接錯誤"));
-          };
-          
-          xhr.ontimeout = function() {
-              console.error("上傳分數超時");
-              self.scoreRetryOrFallback(playerId, score, sendScore, callback, retryCount++, new Error("請求超時"));
-          };
-          
-          try {
-              xhr.open("POST", this.serverUrl + "/leaderboard", true);
-              xhr.setRequestHeader("Content-Type", "application/json");
-              
-              let payload = {
-                  playerId: playerId,
-                  score: score,
-                  date: new Date().toISOString()
-              };
-              
-              xhr.send(JSON.stringify(payload));
-          } catch (e) {
-              console.error("發送上傳分數請求時出錯：", e);
-              self.scoreRetryOrFallback(playerId, score, sendScore, callback, retryCount++, e);
-          }
-      };
-      
-      sendScore();
-      
-      // 返回當前本地排名
-      return this.getPlayerRank(playerId);
+        this.currentPlayerId = playerId;
+        
+        // 先更新本地排行榜，確保有資料可顯示
+        this.addScoreLocally(playerId, score);
+        
+        // 如果是離線模式，加入待上傳隊列
+        if (this.isOfflineMode || !this.db) {
+            this.addToPendingScores(playerId, score);
+            let rank = this.getPlayerRank(playerId);
+            if (callback) callback(new Error("離線模式"), { rank: rank });
+            return rank;
+        }
+
+        // 檢查 Firestore 狀態
+        if (!this.db || !this.leaderboardCollection) {
+            console.error("Firebase Firestore 未初始化");
+            this.isOfflineMode = true;
+            this.addToPendingScores(playerId, score);
+            let rank = this.getPlayerRank(playerId);
+            if (callback) callback(new Error("Firebase 尚未初始化"), { rank: rank });
+            return rank;
+        }
+        
+        // 準備資料
+        const scoreData = {
+            playerId: playerId,
+            score: score,
+            date: new Date().toISOString()
+        };
+        
+        // 先檢查是否已有此玩家的紀錄
+        this.leaderboardCollection.where("playerId", "==", playerId)
+            .get()
+            .then(querySnapshot => {
+                if (!querySnapshot.empty) {
+                    // 已有紀錄，檢查分數是否更高
+                    const docSnapshot = querySnapshot.docs[0];
+                    const existingScore = docSnapshot.data().score;
+                    
+                    if (score > existingScore) {
+                        // 更新分數
+                        return docSnapshot.ref.update({
+                            score: score,
+                            date: new Date().toISOString()
+                        });
+                    } else {
+                        // 現有分數更高，不更新
+                        return Promise.resolve();
+                    }
+                } else {
+                    // 沒有紀錄，新增一筆
+                    return this.leaderboardCollection.add(scoreData);
+                }
+            })
+            .then(() => {
+                console.log("分數上傳成功");
+                // 上傳成功後更新排行榜
+                this.getLeaderboard((err, data) => {
+                    let rank = this.getPlayerRank(playerId);
+                    if (callback) callback(null, { rank: rank });
+                }, true);
+            })
+            .catch(error => {
+                console.error("上傳分數失敗:", error);
+                this.addToPendingScores(playerId, score);
+                let rank = this.getPlayerRank(playerId);
+                if (callback) callback(error, { rank: rank });
+            });
+        
+        // 返回當前本地排名
+        return this.getPlayerRank(playerId);
     },
     
     // 分數上傳重試或回退
@@ -348,7 +349,7 @@ cc.Class({
     
     // 上傳待處理的分數
     uploadPendingScores() {
-        if (this.pendingScores.length === 0 || this.isOfflineMode) {
+        if (this.pendingScores.length === 0 || this.isOfflineMode || !this.db) {
             return;
         }
         
@@ -358,40 +359,59 @@ cc.Class({
         let scoresToUpload = [...this.pendingScores];
         let successCount = 0;
         
-        for (let i = 0; i < scoresToUpload.length; i++) {
-            let item = scoresToUpload[i];
-            let xhr = new XMLHttpRequest();
-            
-            xhr.onreadystatechange = function() {
-                if (xhr.readyState === 4) {
-                    if (xhr.status >= 200 && xhr.status < 300) {
-                        console.log(`待處理分數上傳成功：${item.playerId}, 分數: ${item.score}`);
-                        successCount++;
+        // 使用 Promise.all 批次處理
+        const uploadPromises = scoresToUpload.map(item => {
+            return this.leaderboardCollection.where("playerId", "==", item.playerId)
+                .get()
+                .then(querySnapshot => {
+                    if (!querySnapshot.empty) {
+                        // 已有紀錄，檢查分數是否更高
+                        const docSnapshot = querySnapshot.docs[0];
+                        const existingScore = docSnapshot.data().score;
                         
-                        // 從待上傳隊列中移除
-                        let index = this.pendingScores.findIndex(s => s.playerId === item.playerId && s.score === item.score);
-                        if (index !== -1) {
-                            this.pendingScores.splice(index, 1);
-                            this.savePendingScores();
+                        if (item.score > existingScore) {
+                            // 更新分數
+                            return docSnapshot.ref.update({
+                                score: item.score,
+                                date: item.date
+                            });
+                        } else {
+                            return Promise.resolve();
                         }
-                        
-                        // 所有分數都上傳完成
-                        if (successCount === scoresToUpload.length) {
-                            console.log("所有待處理分數上傳成功");
-                            this.getLeaderboard(); // 刷新排行榜
-                        }
+                    } else {
+                        // 沒有紀錄，新增一筆
+                        return this.leaderboardCollection.add(item);
                     }
+                })
+                .then(() => {
+                    console.log(`待處理分數上傳成功：${item.playerId}, 分數: ${item.score}`);
+                    successCount++;
+                    
+                    // 從待上傳隊列中移除
+                    let index = this.pendingScores.findIndex(s => s.playerId === item.playerId && s.score === item.score);
+                    if (index !== -1) {
+                        this.pendingScores.splice(index, 1);
+                    }
+                    
+                    return Promise.resolve();
+                })
+                .catch(error => {
+                    console.error(`上傳待處理分數失敗：${item.playerId}`, error);
+                    return Promise.reject(error);
+                });
+        });
+        
+        Promise.all(uploadPromises)
+            .then(() => {
+                this.savePendingScores();
+                if (successCount > 0) {
+                    console.log(`${successCount}個待處理分數上傳成功`);
+                    this.getLeaderboard(); // 刷新排行榜
                 }
-            }.bind(this);
-            
-            try {
-                xhr.open("POST", this.serverUrl + "/leaderboard", true);
-                xhr.setRequestHeader("Content-Type", "application/json");
-                xhr.send(JSON.stringify(item));
-            } catch (e) {
-                console.error("上傳待處理分數出錯：", e);
-            }
-        }
+            })
+            .catch(error => {
+                console.error("批次上傳待處理分數時發生錯誤", error);
+            });
     },
     
     // 保存本地排行榜
