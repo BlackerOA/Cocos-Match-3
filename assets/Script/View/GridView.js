@@ -195,7 +195,8 @@ cc.Class({
         this.isInPlayAni = true;
         this.node.runAction(cc.sequence(cc.delayTime(time),cc.callFunc(function(){
             this.isInPlayAni = false;
-            this.controller.checkGoalLeft();
+            // ========== 舊目標系統（已停用） ==========
+            // this.controller.checkGoalLeft();
             this.controller.checkEndGame();
             this.audioUtils.playContinuousMatch(step);
             if (!this.controller.isEndGame()) this.controller.animeEnd();

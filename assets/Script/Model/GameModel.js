@@ -1,6 +1,6 @@
 import CellModel from "./CellModel";
 import { mergePointArray, exclusivePoint } from "../Utils/ModelUtils";
-import { CELL_TYPE, CELL_BASENUM, CELL_STATUS, GRID_WIDTH, GRID_HEIGHT, ANITIME } from "./ConstValue";
+import { CELL_TYPE, CELL_BASENUM, CELL_STATUS, GRID_WIDTH, GRID_HEIGHT, ANITIME, STAGE_CONFIG, SPECIAL_DROP_DISTRIBUTION } from "./ConstValue";
 import { GoalModel } from "./GoalModel";
 import Toast from '../Utils/Toast';
 const LeaderboardManager = require("../Manager/LeaderboardManager");
@@ -13,11 +13,18 @@ export default class GameModel {
     this.lastPos = cc.v2(-1, -1);
     this.cellTypeNum = 4;
     this.cellCreateType = [];                             // 升成种类只在这个数组里面查找
-    this.movesLeft = 20;
+    this.movesLeft = 15;                                  // 改為15步（階段1預設）
     this.isGameOver = false;
+
+    // ========== 舊目標系統（將被階段系統取代） ==========
     this.goalLeft = 99999;
     this.goalCompleteCoins = 0;
     this.goalModel = new GoalModel();
+
+    // ========== 新階段系統 ==========
+    this.currentStage = 1;                                // 當前階段
+    this.stageReachedTarget = false;                      // 當前階段是否已達標
+
     this.totalCrushed = 0;                                // 記錄一輪要消除的數量
     this.coin = 0;
     this.isProcessing = false;                            // 是否正在執行消除動畫
@@ -74,6 +81,20 @@ export default class GameModel {
     // this.cells[2][2].status = CELL_STATUS.WRAP;
     // this.cells[2][4].type = CELL_TYPE.BIRD;
     // this.cells[2][4].status = CELL_STATUS.BIRD;
+
+    // 輸出初始階段資訊
+    console.log("\n🎮 ========== 遊戲開始 ==========");
+    console.log(`🎯 階段系統：共3個階段`);
+    console.log(`📊 階段1目標：10,000分`);
+    console.log(`📊 階段2目標：25,000分`);
+    console.log(`📊 階段3目標：無（最後階段）`);
+    console.log(`👟 每階段步數：15步`);
+    console.log(`\n🎲 特殊方塊掉落機率：`);
+    console.log(`   階段1：5% (直線60% 爆炸30% 鳥10%)`);
+    console.log(`   階段2：2% (直線60% 爆炸30% 鳥10%)`);
+    console.log(`   階段3：0% (不掉落)`);
+    console.log("================================\n");
+    this.logStageInfo();
   }
 
   mock() {
@@ -297,12 +318,13 @@ export default class GameModel {
                 this.birdPlusBird();
             }
             
-            if (lineQuantity + wrapQuantity + birdQuantity === 2) {
-                if (this.goalLeft > 0 && this.goalModel.isConformGoal(model1, model2)) {
-                    this.goalLeft--;
-                    this.gameController.uiGoalLeftMinus();
-                }
-            }
+            // ========== 舊目標系統（已停用） ==========
+            // if (lineQuantity + wrapQuantity + birdQuantity === 2) {
+            //     if (this.goalLeft > 0 && this.goalModel.isConformGoal(model1, model2)) {
+            //         this.goalLeft--;
+            //         this.gameController.uiGoalLeftMinus();
+            //     }
+            // }
         }
 
         if (!specialCrush) {
@@ -349,6 +371,12 @@ export default class GameModel {
     }
 
     this.isProcessing = false;
+
+    // 消除結束後，檢查是否達標
+    setTimeout(() => {
+      this.checkStageTargetReached();
+    }, (this.curTime + 0.5) * 1000);
+
     this.gameController.logicCalculateEnd();
   }
 
@@ -391,7 +419,12 @@ export default class GameModel {
           var count = 1;
           for (var k = curRow; k <= GRID_HEIGHT; k++) {
             this.cells[k][j] = new CellModel();
-            this.cells[k][j].init(this.getRandomCellType());
+
+            // 使用新的生成方法，有機率生成特殊方塊
+            const cellData = this.generateNewCellWithSpecialChance();
+            this.cells[k][j].init(cellData.type);
+            this.cells[k][j].setStatus(cellData.status);
+
             this.cells[k][j].setStartXY(j, count + GRID_HEIGHT);
             this.cells[k][j].setXY(j, count + GRID_HEIGHT);
             this.cells[k][j].moveTo(cc.v2(j, k), this.curTime);
@@ -453,6 +486,56 @@ export default class GameModel {
     var index = Math.floor(Math.random() * this.cellTypeNum);
     return this.cellCreateType[index];
   }
+
+  /**
+   * 根據當前階段機率生成新方塊（可能是特殊方塊）
+   * @returns {Object} { type: CELL_TYPE, status: CELL_STATUS }
+   */
+  generateNewCellWithSpecialChance() {
+    const config = this.getCurrentStageConfig();
+    const baseRate = config.specialDropRate;
+
+    // 如果基礎機率為0，直接返回普通方塊
+    if (baseRate === 0) {
+      return {
+        type: this.getRandomCellType(),
+        status: CELL_STATUS.COMMON
+      };
+    }
+
+    // 判斷是否生成特殊方塊
+    const rand = Math.random();
+    if (rand < baseRate) {
+      // 生成特殊方塊
+      const specialRand = Math.random();
+      let specialStatus;
+      let cellType = this.getRandomCellType(); // 特殊方塊的顏色
+
+      if (specialRand < SPECIAL_DROP_DISTRIBUTION.LINE) {
+        // 60% - 直線型（隨機橫向或縱向）
+        specialStatus = Math.random() < 0.5 ? CELL_STATUS.LINE : CELL_STATUS.COLUMN;
+      } else if (specialRand < SPECIAL_DROP_DISTRIBUTION.LINE + SPECIAL_DROP_DISTRIBUTION.WRAP) {
+        // 30% - 爆炸型
+        specialStatus = CELL_STATUS.WRAP;
+      } else {
+        // 10% - 鳥型
+        specialStatus = CELL_STATUS.BIRD;
+        cellType = CELL_TYPE.BIRD; // 鳥型使用特殊類型
+      }
+
+      return {
+        type: cellType,
+        status: specialStatus
+      };
+    }
+
+    // 生成普通方塊
+    return {
+      type: this.getRandomCellType(),
+      status: CELL_STATUS.COMMON
+    };
+  }
+
   // TODO bombModels去重
   processBomb(bombModels, cycleCount) {
     while (bombModels.length > 0) {
@@ -744,16 +827,17 @@ export default class GameModel {
       model.toShake(this.curTime);
     }
 
-    let goalMinus = false;
-    if (this.goalLeft > 0 && this.goalModel.isConformGoal(model)) {
-      goalMinus = true;
-      this.goalLeft--;
-    }
+    // ========== 舊目標系統（已停用） ==========
+    // let goalMinus = false;
+    // if (this.goalLeft > 0 && this.goalModel.isConformGoal(model)) {
+    //   goalMinus = true;
+    //   this.goalLeft--;
+    // }
 
     this.totalCrushed++;
 
     let shakeTime = needShake ? ANITIME.DIE_SHAKE : 0;
-    model.toDie(this.curTime + shakeTime, goalMinus);
+    model.toDie(this.curTime + shakeTime, false); // goalMinus 固定為 false
     this.addCrushEffect(this.curTime + shakeTime, cc.v2(model.x, model.y), step);
     this.cells[y][x] = null;
   }
@@ -795,20 +879,35 @@ export default class GameModel {
 
   earnCoinsByStep(totalSteps) {
     let stepBonus = 3 * Math.pow(totalSteps, 2);
-    console.log(`Combo ${totalSteps} 結算獲得 ${stepBonus} 金幣！`);
     this.earnCoin(stepBonus);
   }
 
   checkEndGame() {
-    if (!this.isGameOver && this.movesLeft === 0) {
-      this.endGame();
+    if (this.isGameOver) {
+      return;
+    }
+
+    // 檢查是否達標
+    this.checkStageTargetReached();
+
+    // 檢查步數是否用完
+    if (this.movesLeft === 0) {
+      // 使用階段系統的結束檢查
+      const shouldEndGame = this.checkStageEnd();
+
+      if (shouldEndGame) {
+        this.endGame();
+      }
     }
   }
 
   endGame() {
     this.isGameOver = true;
-    console.log("遊戲結束！步數已用完。");
-    
+    console.log("\n🏁 ========== 遊戲結束 ==========");
+    console.log(`最終分數：${this.coin}`);
+    console.log(`完成階段：${this.currentStage}`);
+    console.log("================================\n");
+
     // 確保所有金幣計算完成
     setTimeout(() => {
       this.saveScoreToLeaderboard();
@@ -854,6 +953,116 @@ export default class GameModel {
 
   earnCoin(amount) {
     this.setCoin(this.getCoin() + amount);
+  }
+
+  // ========== 階段系統方法 ==========
+
+  /**
+   * 獲取當前階段配置
+   */
+  getCurrentStageConfig() {
+    return STAGE_CONFIG[this.currentStage];
+  }
+
+  /**
+   * 獲取當前階段目標分數
+   */
+  getCurrentStageTargetScore() {
+    const config = this.getCurrentStageConfig();
+    return config ? config.targetScore : null;
+  }
+
+  /**
+   * 檢查是否達到當前階段目標
+   */
+  checkStageTargetReached() {
+    const targetScore = this.getCurrentStageTargetScore();
+
+    // 如果沒有目標分數（階段3），直接返回 false
+    if (targetScore === null) {
+      return false;
+    }
+
+    // 如果已經達標過了，不再重複檢查
+    if (this.stageReachedTarget) {
+      return false;
+    }
+
+    // 檢查是否達標
+    if (this.coin >= targetScore) {
+      this.stageReachedTarget = true;
+      console.log(`🎯 階段 ${this.currentStage} 達標！當前分數：${this.coin} / 目標分數：${targetScore}`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 進入下一階段
+   */
+  advanceToNextStage() {
+    if (this.currentStage >= 3) {
+      console.log("⚠️ 已經是最後階段，無法再進階");
+      return false;
+    }
+
+    this.currentStage++;
+    this.stageReachedTarget = false;
+
+    const newConfig = this.getCurrentStageConfig();
+    this.movesLeft = newConfig.steps; // 重置步數
+
+    console.log(`\n🎉 ========== 進入階段 ${this.currentStage} ==========`);
+    console.log(`📊 目標分數：${newConfig.targetScore || '無（最後階段）'}`);
+    console.log(`👟 剩餘步數：${this.movesLeft}`);
+    console.log(`💰 當前分數：${this.coin}`);
+    console.log(`🎲 特殊方塊掉落率：${(newConfig.specialDropRate * 100).toFixed(0)}%`);
+    console.log(`==========================================\n`);
+
+    return true;
+  }
+
+  /**
+   * 檢查階段是否結束（步數用完）
+   */
+  checkStageEnd() {
+    if (this.movesLeft > 0) {
+      return false;
+    }
+
+    console.log(`\n⏱️ ========== 階段 ${this.currentStage} 步數用完 ==========`);
+
+    // 如果已達標且不是最後階段，進入下一階段
+    if (this.stageReachedTarget && this.currentStage < 3) {
+      console.log(`✅ 分數已達標，準備進入下一階段...`);
+      this.advanceToNextStage();
+      return false; // 遊戲繼續
+    }
+
+    // 未達標或已是最後階段，遊戲結束
+    if (!this.stageReachedTarget && this.currentStage < 3) {
+      console.log(`❌ 分數未達標！目標：${this.getCurrentStageTargetScore()}，當前：${this.coin}`);
+    } else {
+      console.log(`🏁 最後階段結束！`);
+    }
+
+    console.log(`==========================================\n`);
+    return true; // 遊戲結束
+  }
+
+  /**
+   * 輸出當前階段信息（用於調試）
+   */
+  logStageInfo() {
+    const config = this.getCurrentStageConfig();
+    console.log(`\n📋 ========== 當前階段資訊 ==========`);
+    console.log(`🎮 階段：${this.currentStage} / 3`);
+    console.log(`💰 當前分數：${this.coin}`);
+    console.log(`🎯 目標分數：${config.targetScore || '無（最後階段）'}`);
+    console.log(`👟 剩餘步數：${this.movesLeft}`);
+    console.log(`✅ 是否達標：${this.stageReachedTarget ? '是' : '否'}`);
+    console.log(`====================================\n`);
   }
 
   // return { value: [hints], hint: [crushCells] }

@@ -92,3 +92,33 @@ export const CRUSH_QUANTITY = [
   2,      // WRAP_PLUS_BIRD
   1       // BIRD_PLUS_BIRD
 ];
+
+
+// ******************** 階段系統配置 **************************
+export const STAGE_CONFIG = {
+  1: {
+    stage: 1,
+    targetScore: 10000,    // 階段1目標分數
+    steps: 15,             // 階段1步數
+    specialDropRate: 0.05  // 5% 基礎掉落機率
+  },
+  2: {
+    stage: 2,
+    targetScore: 25000,    // 階段2目標分數（累計）
+    steps: 15,             // 階段2步數
+    specialDropRate: 0.02  // 2% 基礎掉落機率
+  },
+  3: {
+    stage: 3,
+    targetScore: null,     // 階段3無目標
+    steps: 15,             // 階段3步數
+    specialDropRate: 0     // 0% 不掉落特殊方塊
+  }
+};
+
+// 特殊方塊掉落類型分佈（在基礎機率內的分配）
+export const SPECIAL_DROP_DISTRIBUTION = {
+  LINE: 0.60,    // 60% - 直線型
+  WRAP: 0.30,    // 30% - 爆炸型
+  BIRD: 0.10     // 10% - 鳥型
+};

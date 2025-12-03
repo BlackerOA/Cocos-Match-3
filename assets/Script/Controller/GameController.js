@@ -87,11 +87,13 @@ cc.Class({
   },
 
   start: function() {
-    this.gameModel.nextGoal();
+    // ========== 舊目標系統（已停用） ==========
+    // this.gameModel.nextGoal();
+
     this.gridScript.setHints(this.getHints());
     this.hintTimerScript.setInterval(2);
     this.hintTimerScript.setWorkable(true);
-    
+
     // 設置思考計時器
     this.thinkingTimerScript.setTimeLimit(15); // 設置15秒思考時間
     this.thinkingTimerScript.setWorkable(true); // 啟動計時器
@@ -259,17 +261,18 @@ cc.Class({
     this.goalLeftLabelScript.goalLeftMinus();
   },
 
-  checkGoalLeft() {
-    console.log(`Logic Goal Left: ${this.getLogicGoalLeft()}, UI Goal Left: ${this.getUIGoalLeft()}`);
-    if (this.getLogicGoalLeft() !== this.getUIGoalLeft()) {
-      console.error("邏輯和UI的goalLeft不一致，自動校正");
-      this.setUIGoalLeft(this.getLogicGoalLeft());
-    }
-
-    if (this.gameModel.getGoalLeft() === 0) {
-      this.gameModel.nextGoal();
-    }
-  },
+  // ========== 舊目標系統（已停用） ==========
+  // checkGoalLeft() {
+  //   console.log(`Logic Goal Left: ${this.getLogicGoalLeft()}, UI Goal Left: ${this.getUIGoalLeft()}`);
+  //   if (this.getLogicGoalLeft() !== this.getUIGoalLeft()) {
+  //     console.error("邏輯和UI的goalLeft不一致，自動校正");
+  //     this.setUIGoalLeft(this.getLogicGoalLeft());
+  //   }
+  //
+  //   if (this.gameModel.getGoalLeft() === 0) {
+  //     this.gameModel.nextGoal();
+  //   }
+  // },
 
   goalComplete() {
     this.gameModel.drawGoalCompleteCoins();
