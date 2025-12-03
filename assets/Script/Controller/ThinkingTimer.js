@@ -68,9 +68,12 @@ cc.Class({
         this.resetTimer();
     },
 
-    setWorkable: function(tf) {
+    setWorkable: function(tf, shouldReset = true) {
         if (tf && !this.workable) {
-            this.resetTimer();
+            // 只有在 shouldReset 為 true 時才重置計時器
+            if (shouldReset) {
+                this.resetTimer();
+            }
             this.workable = true;
             return;
         }

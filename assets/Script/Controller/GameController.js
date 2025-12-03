@@ -137,7 +137,28 @@ cc.Class({
 
   animeEnd: function() {
     this.hintTimerScript.setWorkable(true);
-    this.thinkingTimerScript.setWorkable(true);
+
+    // 只有在步數用完時才需要等待分數計算完成
+    // 如果步數還有，立刻重置計時器
+    if (this.gameModel.movesLeft > 0) {
+      // 步數還有，立刻重置計時器
+      this.thinkingTimerScript.setWorkable(true, true);
+      return;
+    }
+
+    // 步數用完的情況，需要等待分數計算完成
+    if (this.gameModel.isScoringComplete === false) {
+      setTimeout(() => {
+        this.animeEnd(); // 重新呼叫自己
+      }, 100);
+      return;
+    }
+
+    // 分數計算完成，且步數用完
+    // 只有在不處於暫停狀態時才恢復計時器（重置回15秒）
+    if (!this.gameModel.isProcessing) {
+      this.thinkingTimerScript.setWorkable(true, true);
+    }
   },
 
   autoSelectCells: function (pos1, pos2) {

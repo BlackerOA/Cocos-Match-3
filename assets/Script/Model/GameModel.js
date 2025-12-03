@@ -13,7 +13,7 @@ export default class GameModel {
     this.lastPos = cc.v2(-1, -1);
     this.cellTypeNum = 4;
     this.cellCreateType = [];                             // 升成种类只在这个数组里面查找
-    this.movesLeft = 15;                                  // 改為15步（階段1預設）
+    this.movesLeft = 15;                                  
     this.isGameOver = false;
 
     // ========== 舊目標系統（將被階段系統取代） ==========
@@ -28,6 +28,7 @@ export default class GameModel {
     this.totalCrushed = 0;                                // 記錄一輪要消除的數量
     this.coin = 0;
     this.isProcessing = false;                            // 是否正在執行消除動畫
+    this.isScoringComplete = true;                        // 分數計算是否完成（初始為true）
     this.currentHint = null;                              // 當前提示
   }
 
@@ -267,6 +268,7 @@ export default class GameModel {
   processCrush(checkPoint) {
     let cycleCount = 1;
     this.isProcessing = true;
+    this.isScoringComplete = false; // 標記分數計算尚未完成
 
     while (checkPoint.length > 0) {
         this.totalCrushed = 0;
@@ -372,8 +374,9 @@ export default class GameModel {
 
     this.isProcessing = false;
 
-    // 消除結束後，檢查是否達標
+    // 消除結束後，在分數計算完成後檢查是否達標和遊戲結束
     setTimeout(() => {
+      this.isScoringComplete = true; // 標記分數計算完成
       this.checkStageTargetReached();
     }, (this.curTime + 0.5) * 1000);
 
@@ -887,6 +890,15 @@ export default class GameModel {
       return;
     }
 
+    // 如果分數計算尚未完成，延遲檢查
+    if (this.isScoringComplete === false) {
+      console.log('分數計算尚未完成，延遲檢查遊戲結束');
+      setTimeout(() => {
+        this.checkEndGame();
+      }, 100);
+      return;
+    }
+
     // 檢查是否達標
     this.checkStageTargetReached();
 
@@ -1020,6 +1032,12 @@ export default class GameModel {
     console.log(`🎲 特殊方塊掉落率：${(newConfig.specialDropRate * 100).toFixed(0)}%`);
     console.log(`==========================================\n`);
 
+    // 先確保計時器停止，然後重置數值到 15 秒
+    if (this.gameController && this.gameController.thinkingTimerScript) {
+      this.gameController.thinkingTimerScript.setWorkable(false); // 先停止
+      this.gameController.thinkingTimerScript.resetTimer(); // 重置數值到 15 秒
+    }
+
     // 顯示階段過場 Toast 並暫停遊戲
     this.showStageTransitionToast(this.currentStage, newConfig.targetScore);
 
@@ -1058,9 +1076,9 @@ export default class GameModel {
     setTimeout(() => {
       this.isProcessing = false;
 
-      // 恢復思考計時器
+      // 恢復思考計時器（false 表示不重置，從 15 秒開始倒數）
       if (this.gameController && this.gameController.thinkingTimerScript) {
-        this.gameController.thinkingTimerScript.setWorkable(true);
+        this.gameController.thinkingTimerScript.setWorkable(true, false);
       }
 
       console.log(`階段 ${stage} 開始，繼續遊戲`);
