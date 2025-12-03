@@ -1020,7 +1020,51 @@ export default class GameModel {
     console.log(`🎲 特殊方塊掉落率：${(newConfig.specialDropRate * 100).toFixed(0)}%`);
     console.log(`==========================================\n`);
 
+    // 顯示階段過場 Toast 並暫停遊戲
+    this.showStageTransitionToast(this.currentStage, newConfig.targetScore);
+
     return true;
+  }
+
+  /**
+   * 顯示階段過場 Toast 並暫停遊戲
+   */
+  showStageTransitionToast(stage, targetScore) {
+    // 暫停遊戲操作
+    this.isProcessing = true;
+
+    // 暫停思考計時器
+    if (this.gameController && this.gameController.thinkingTimerScript) {
+      this.gameController.thinkingTimerScript.setWorkable(false);
+    }
+
+    const Toast = require('../Utils/Toast');
+
+    let message = '';
+    if (stage === 2) {
+      message = `🎉 進入階段 ${stage}！\n目標分數：${targetScore}`;
+    } else if (stage === 3) {
+      message = `🎉 進入階段 ${stage}！\n最後階段，全力衝刺！`;
+    }
+
+    Toast(message, {
+      duration: 2,
+      gravity: "CENTER",
+      bg_color: cc.color(0, 0, 0, 200),
+      text_color: cc.color(255, 215, 0) // 金色文字
+    });
+
+    // 2秒後恢復遊戲操作和計時器
+    setTimeout(() => {
+      this.isProcessing = false;
+
+      // 恢復思考計時器
+      if (this.gameController && this.gameController.thinkingTimerScript) {
+        this.gameController.thinkingTimerScript.setWorkable(true);
+      }
+
+      console.log(`階段 ${stage} 開始，繼續遊戲`);
+    }, 2000);
   }
 
   /**

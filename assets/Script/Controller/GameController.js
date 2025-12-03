@@ -25,15 +25,6 @@ cc.Class({
       default: null,
       type: cc.Node,
     },
-    goalLeftLabel: {
-      default: null,
-      type: cc.Node
-    },
-    goal: {
-      default: null,
-      type: cc.Node,
-      tooltip: "包含所有目標圖片的父節點"
-    },
     comboLabel: {
       default: null,
       type: cc.Node,
@@ -45,12 +36,6 @@ cc.Class({
   onLoad: function () {
     if (!this.audioSource) {
       this.audioSource = cc.find("Canvas/AudioSource").getComponent(cc.AudioSource);
-    }
-    if (!this.goalLeftLabel) {
-      this.goalLeftLabel = cc.find("Canvas/Goal/Goal Left");
-    }
-    if (!this.goal) {
-      this.goal = cc.find("Canvas/Goal");
     }
     if (!this.thinkingTimer) {
       this.thinkingTimer = cc.find("Canvas/ThinkingTimeLabel");
@@ -72,10 +57,7 @@ cc.Class({
     this.hintTimerScript.setGameController(this);
     this.thinkingTimerScript = this.thinkingTimer.getComponent("ThinkingTimer");
     this.thinkingTimerScript.setGameController(this);
-    this.goalLeftLabelScript = this.goalLeftLabel.getComponent("GoalLeftView");
-    this.goalLeftLabelScript.setGameController(this);
-    this.goalTypeImgScript = this.goal.getComponent("GoalTypeImgView");
-    
+
     // 初始化 comboLabel
     if (this.comboLabel) {
       this.comboLabelComponent = this.comboLabel.getComponent(cc.Label);
@@ -244,43 +226,7 @@ cc.Class({
     }
   },
 
-  getLogicGoalLeft() {
-    return this.gameModel.getGoalLeft();
-  },
-  setLogicGoalLeft(num) {
-    this.gameModel.setGoalLeft(num);
-  },
-  getUIGoalLeft() {
-    return this.goalLeftLabelScript.getGoalLeft();
-  },
-  setUIGoalLeft(num) {
-    this.goalLeftLabelScript.setGoalLeft(num);
-  },
-
-  uiGoalLeftMinus() {
-    this.goalLeftLabelScript.goalLeftMinus();
-  },
-
-  // ========== 舊目標系統（已停用） ==========
-  // checkGoalLeft() {
-  //   console.log(`Logic Goal Left: ${this.getLogicGoalLeft()}, UI Goal Left: ${this.getUIGoalLeft()}`);
-  //   if (this.getLogicGoalLeft() !== this.getUIGoalLeft()) {
-  //     console.error("邏輯和UI的goalLeft不一致，自動校正");
-  //     this.setUIGoalLeft(this.getLogicGoalLeft());
-  //   }
-  //
-  //   if (this.gameModel.getGoalLeft() === 0) {
-  //     this.gameModel.nextGoal();
-  //   }
-  // },
-
-  goalComplete() {
-    this.gameModel.drawGoalCompleteCoins();
-  },
-
-  setGoalTypeImg(goalType, cellType) {
-    this.goalTypeImgScript.changeSprite(goalType, cellType);
-  },
+  // ========== 舊目標系統方法已完全移除 ==========
 
   startThinkingTimer() {
     this.gameModel.startThinkingTimer();
@@ -354,5 +300,28 @@ cc.Class({
     
     // 運行動畫序列
     this.comboLabel.runAction(sequence);
+  },
+
+  /**
+   * 顯示階段過場提示框
+   * @param {number} stage - 新階段編號
+   * @param {number|null} targetScore - 目標分數
+   */
+  showStageTransition: function(stage, targetScore) {
+    if (!this.stageTransition) {
+      console.warn("StageTransition node not found!");
+      return;
+    }
+
+    const stageTransitionScript = this.stageTransition.getComponent("StageTransitionView");
+    if (!stageTransitionScript) {
+      console.error("StageTransitionView component not found!");
+      return;
+    }
+
+    // 顯示提示框，持續2秒
+    stageTransitionScript.show(stage, targetScore, 2, () => {
+      console.log(`階段過場動畫完成，繼續遊戲`);
+    });
   },
 });

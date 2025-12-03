@@ -24,7 +24,7 @@ cc.Class({
         const gameController = this.gameScene.getComponent("GameController");
         if (gameController) {
             this.gameModel = gameController.getGameModel();
-            this.label.string = this.gameModel.getCoin();
+            this.updateDisplay();
         } else {
             console.error("GameController not found on gameScene.");
         }
@@ -32,7 +32,36 @@ cc.Class({
 
     update (dt) {
         if (this.gameModel) {
-            this.label.string = this.gameModel.getCoin();
+            this.updateDisplay();
+        }
+    },
+
+    updateDisplay() {
+        if (!this.gameModel) return;
+
+        const currentScore = this.gameModel.getCoin();
+        const targetScore = this.gameModel.getCurrentStageTargetScore();
+        const movesLeft = this.gameModel.movesLeft;
+        const isReached = this.gameModel.stageReachedTarget;
+
+        // 更新文字內容
+        if (targetScore !== null) {
+            this.label.string = `${currentScore} / ${targetScore}`;
+        } else {
+            // 階段3沒有目標，只顯示當前分數
+            this.label.string = `${currentScore}`;
+        }
+
+        // 更新顏色
+        if (isReached) {
+            // 已達標 -> 金色
+            this.node.color = cc.color(255, 215, 0);
+        } else if (movesLeft <= 3 && targetScore !== null && currentScore < targetScore) {
+            // 剩餘步數<=3且未達標 -> 紅色
+            this.node.color = cc.color(255, 0, 0);
+        } else {
+            // 正常狀態 -> 白色
+            this.node.color = cc.color(255, 255, 255);
         }
     }
 });
