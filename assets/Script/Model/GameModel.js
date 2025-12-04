@@ -24,6 +24,7 @@ export default class GameModel {
     // ========== 新階段系統 ==========
     this.currentStage = 1;                                // 當前階段
     this.stageReachedTarget = false;                      // 當前階段是否已達標
+    this.isStageTransitioning = false;                    // Bug #3 修復：是否正在階段轉換中
 
     this.totalCrushed = 0;                                // 記錄一輪要消除的數量
     this.coin = 0;
@@ -1080,6 +1081,9 @@ export default class GameModel {
       return false;
     }
 
+    // Bug #3 修復：標記正在階段轉換中
+    this.isStageTransitioning = true;
+
     this.currentStage++;
     this.stageReachedTarget = false;
 
@@ -1136,6 +1140,7 @@ export default class GameModel {
     // 2秒後恢復遊戲操作和計時器
     setTimeout(() => {
       this.isProcessing = false;
+      this.isStageTransitioning = false;  // Bug #3 修復：清除階段轉換標記
 
       // 恢復思考計時器（false 表示不重置，從 15 秒開始倒數）
       if (this.gameController && this.gameController.thinkingTimerScript) {

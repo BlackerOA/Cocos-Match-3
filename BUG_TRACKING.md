@@ -150,7 +150,7 @@ checkIfCellAffectedByBombs(targetPos, bombModels) {
 
 ---
 
-## Bug #3: 階段轉換時計時器依然倒數 ⏳
+## Bug #3: 階段轉換時計時器依然倒數 ✅
 
 ### 問題描述
 轉換階段顯示提示框時，遊戲應該暫停2秒（提示框顯示時長）。
@@ -158,8 +158,9 @@ checkIfCellAffectedByBombs(targetPos, bombModels) {
 - 結果：提示框消失後timer已經從15秒變成13秒
 
 ### 根本原因
-在階段轉換流程中，計時器雖然被暫停，但可能在某個環節被重新啟動。
-需要新增狀態標記防止在階段轉換期間重啟計時器。
+在階段轉換流程中，計時器雖然被暫停，但在 `GameController.animeEnd()` 方法中可能被重新啟動。
+- Toast 顯示期間 `isProcessing = true`，但消除動畫結束後 `animeEnd()` 會嘗試重啟計時器
+- 缺少專門的階段轉換狀態標記來防止計時器被重啟
 
 ### 解決方案
 1. 在 `GameModel` 中新增 `isStageTransitioning` 標記
@@ -168,11 +169,75 @@ checkIfCellAffectedByBombs(targetPos, bombModels) {
 4. 在 `GameController.animeEnd()` 中檢查此標記，防止重啟計時器
 
 ### 修改檔案
-- `assets/Script/Model/GameModel.js` - 新增狀態標記和修改階段轉換邏輯
-- `assets/Script/Controller/GameController.js` - 修改 `animeEnd()` 方法
+- ✅ `assets/Script/Model/GameModel.js:27` - 新增 `isStageTransitioning` 狀態標記
+- ✅ `assets/Script/Model/GameModel.js:1085` - `advanceToNextStage()` 設置轉換標記
+- ✅ `assets/Script/Model/GameModel.js:1143` - `showStageTransitionToast()` 清除轉換標記
+- ✅ `assets/Script/Controller/GameController.js:144-148, 162-164` - `animeEnd()` 檢查轉換標記
+
+### 修復內容
+
+**1. 在 GameModel 中新增狀態標記**：
+```javascript
+constructor() {
+    // ...
+    this.isStageTransitioning = false;  // Bug #3 修復：是否正在階段轉換中
+}
+```
+
+**2. 在 advanceToNextStage() 設置標記**：
+```javascript
+advanceToNextStage() {
+    // Bug #3 修復：標記正在階段轉換中
+    this.isStageTransitioning = true;
+
+    // ...其他邏輯...
+}
+```
+
+**3. 在 showStageTransitionToast() 清除標記**：
+```javascript
+setTimeout(() => {
+    this.isProcessing = false;
+    this.isStageTransitioning = false;  // Bug #3 修復：清除階段轉換標記
+
+    // 恢復計時器
+    this.gameController.thinkingTimerScript.setWorkable(true, false);
+}, 2000);
+```
+
+**4. 在 animeEnd() 檢查轉換標記**：
+```javascript
+animeEnd: function() {
+    if (this.gameModel.movesLeft > 0) {
+        // Bug #3 修復：階段轉換期間不重啟計時器
+        if (!this.gameModel.isStageTransitioning) {
+            this.thinkingTimerScript.setWorkable(true, true);
+        }
+        return;
+    }
+
+    // ...
+
+    // Bug #3 修復：只有在不處於暫停狀態且不在階段轉換中時才恢復計時器
+    if (!this.gameModel.isProcessing && !this.gameModel.isStageTransitioning) {
+        this.thinkingTimerScript.setWorkable(true, true);
+    }
+}
+```
+
+### 技術說明
+- `isStageTransitioning` 標記確保在整個階段轉換過程中計時器不會被意外啟動
+- Toast 顯示期間（2秒）：
+  1. `isProcessing = true` - 暫停遊戲操作
+  2. `isStageTransitioning = true` - 防止計時器重啟
+  3. 計時器停止並重置到15秒（但不開始倒數）
+- Toast 結束後：
+  1. 清除兩個標記
+  2. 計時器從15秒開始倒數
+  3. 玩家可以繼續操作
 
 ### 修復進度
-- ⏳ 待開始修復
+- ✅ 已完成修復 (2025-12-04)
 
 ---
 
@@ -278,4 +343,4 @@ checkIfCellAffectedByBombs(targetPos, bombModels) {
 ---
 
 **最後更新**: 2025-12-04
-**修復進度**: 2/5 (40%)
+**修復進度**: 3/5 (60%)

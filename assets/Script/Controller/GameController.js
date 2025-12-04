@@ -141,8 +141,11 @@ cc.Class({
     // 只有在步數用完時才需要等待分數計算完成
     // 如果步數還有，立刻重置計時器
     if (this.gameModel.movesLeft > 0) {
-      // 步數還有，立刻重置計時器
-      this.thinkingTimerScript.setWorkable(true, true);
+      // Bug #3 修復：階段轉換期間不重啟計時器
+      if (!this.gameModel.isStageTransitioning) {
+        // 步數還有，立刻重置計時器
+        this.thinkingTimerScript.setWorkable(true, true);
+      }
       return;
     }
 
@@ -155,8 +158,8 @@ cc.Class({
     }
 
     // 分數計算完成，且步數用完
-    // 只有在不處於暫停狀態時才恢復計時器（重置回15秒）
-    if (!this.gameModel.isProcessing) {
+    // Bug #3 修復：只有在不處於暫停狀態且不在階段轉換中時才恢復計時器
+    if (!this.gameModel.isProcessing && !this.gameModel.isStageTransitioning) {
       this.thinkingTimerScript.setWorkable(true, true);
     }
   },
