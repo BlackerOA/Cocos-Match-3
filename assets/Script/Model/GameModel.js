@@ -593,9 +593,11 @@ export default class GameModel {
           for (let i = 1; i <= GRID_HEIGHT; i++) {
             for (let j = 1; j <= GRID_WIDTH; j++) {
               if (this.cells[i][j] && this.cells[i][j].type == crushType) {
+                // Bug #1 修復：先檢查是否為特殊方塊並加入爆炸隊列
                 if (this.cells[i][j].status != CELL_STATUS.COMMON) {
                   newBombModel.push(this.cells[i][j]);
                 }
+                // 所有匹配的方塊都要消除（包括特殊方塊）
                 this.crushCell(j, i, true, cycleCount);
               }
             }
