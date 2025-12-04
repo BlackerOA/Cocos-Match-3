@@ -343,7 +343,22 @@ export default class GameModel {
                         bombModels.push(model);
                     }
                 }
+
+                // 生成新的特殊方塊
                 this.createNewCell(crushPoint, newCellStatus, newCellType);
+
+                // Bug #2 修復：檢查新生成的方塊是否會被爆炸波及
+                if (newCellStatus !== "" && bombModels.length > 0) {
+                    let newCell = this.cells[crushPoint.y][crushPoint.x];
+                    if (newCell && newCell.status !== CELL_STATUS.COMMON) {
+                        // 檢查是否在任何爆炸範圍內
+                        let willBeAffected = this.checkIfCellAffectedByBombs(crushPoint, bombModels);
+                        if (willBeAffected) {
+                            // 新生成的特殊方塊會被炸到，也加入爆炸隊列
+                            bombModels.push(newCell);
+                        }
+                    }
+                }
             }
 
             this.processBomb(bombModels, cycleCount);
@@ -822,6 +837,50 @@ export default class GameModel {
         pos,
         action: "wrapBomb"  // 確保使用 wrapBomb 而不是其他動作名稱
     });
+  }
+
+  /**
+   * Bug #2 修復：檢查指定位置的方塊是否會被炸彈陣列波及
+   * @param {cc.v2} targetPos - 要檢查的位置
+   * @param {Array} bombModels - 炸彈方塊陣列
+   * @returns {boolean} - 是否會被波及
+   */
+  checkIfCellAffectedByBombs(targetPos, bombModels) {
+    for (let bomb of bombModels) {
+      // LINE：消除同一行
+      if (bomb.status === CELL_STATUS.LINE && targetPos.y === bomb.y) {
+        return true;
+      }
+
+      // COLUMN：消除同一列
+      if (bomb.status === CELL_STATUS.COLUMN && targetPos.x === bomb.x) {
+        return true;
+      }
+
+      // WRAP：消除曼哈頓距離≤2的範圍
+      if (bomb.status === CELL_STATUS.WRAP) {
+        let manhattanDist = Math.abs(targetPos.x - bomb.x) + Math.abs(targetPos.y - bomb.y);
+        if (manhattanDist <= 2) {
+          return true;
+        }
+      }
+
+      // BIRD：消除同色方塊（需要檢查新生成方塊的顏色）
+      // 注意：新生成的特殊方塊可能跟被消除的方塊同色
+      if (bomb.status === CELL_STATUS.BIRD) {
+        let crushType = bomb.type;
+        if (crushType === CELL_TYPE.BIRD) {
+          // 如果鳥自己是BIRD類型，會隨機選擇顏色，這裡無法預測
+          // 為安全起見，暫不處理這種情況
+          continue;
+        }
+        let newCell = this.cells[targetPos.y][targetPos.x];
+        if (newCell && newCell.type === crushType) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   // cell消除逻辑

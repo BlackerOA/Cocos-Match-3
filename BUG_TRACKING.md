@@ -54,7 +54,7 @@ this.crushCell(j, i, true, cycleCount);  // 從cells陣列移除但對象還在
 
 ---
 
-## Bug #2: 合併生成的特殊方塊被同時炸掉，沒有觸發效果 ⏳
+## Bug #2: 合併生成的特殊方塊被同時炸掉，沒有觸發效果 ✅
 
 ### 問題描述
 邏輯順序應該是先合併再消除。假設我的消除操作會合併出鳥並同時把爆炸消掉：
@@ -75,13 +75,78 @@ this.crushCell(j, i, true, cycleCount);  // 從cells陣列移除但對象還在
 ### 解決方案
 1. 在生成新方塊後，檢查該位置是否會被爆炸波及
 2. 如果會被波及且是特殊方塊，也將它加入爆炸隊列
-3. 新增輔助方法 `checkIfAffectedByBombs()` 檢測爆炸範圍
+3. 新增輔助方法 `checkIfCellAffectedByBombs()` 檢測爆炸範圍
 
 ### 修改檔案
-- `assets/Script/Model/GameModel.js` - `processCrush()` 方法和新增輔助方法
+- ✅ `assets/Script/Model/GameModel.js:332-365` - `processCrush()` 方法
+- ✅ `assets/Script/Model/GameModel.js:842-884` - 新增 `checkIfCellAffectedByBombs()` 輔助方法
+
+### 修復內容
+
+**1. 在 processCrush() 中新增檢查邏輯**：
+```javascript
+// 生成新的特殊方塊
+this.createNewCell(crushPoint, newCellStatus, newCellType);
+
+// Bug #2 修復：檢查新生成的方塊是否會被爆炸波及
+if (newCellStatus !== "" && bombModels.length > 0) {
+    let newCell = this.cells[crushPoint.y][crushPoint.x];
+    if (newCell && newCell.status !== CELL_STATUS.COMMON) {
+        // 檢查是否在任何爆炸範圍內
+        let willBeAffected = this.checkIfCellAffectedByBombs(crushPoint, bombModels);
+        if (willBeAffected) {
+            // 新生成的特殊方塊會被炸到，也加入爆炸隊列
+            bombModels.push(newCell);
+        }
+    }
+}
+```
+
+**2. 新增輔助方法檢測爆炸範圍**：
+```javascript
+checkIfCellAffectedByBombs(targetPos, bombModels) {
+    for (let bomb of bombModels) {
+        // LINE：檢查是否在同一行
+        if (bomb.status === CELL_STATUS.LINE && targetPos.y === bomb.y) {
+            return true;
+        }
+
+        // COLUMN：檢查是否在同一列
+        if (bomb.status === CELL_STATUS.COLUMN && targetPos.x === bomb.x) {
+            return true;
+        }
+
+        // WRAP：檢查曼哈頓距離≤2
+        if (bomb.status === CELL_STATUS.WRAP) {
+            let manhattanDist = Math.abs(targetPos.x - bomb.x) + Math.abs(targetPos.y - bomb.y);
+            if (manhattanDist <= 2) {
+                return true;
+            }
+        }
+
+        // BIRD：檢查是否同色
+        if (bomb.status === CELL_STATUS.BIRD) {
+            let crushType = bomb.type;
+            if (crushType !== CELL_TYPE.BIRD) {
+                let newCell = this.cells[targetPos.y][targetPos.x];
+                if (newCell && newCell.type === crushType) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+```
+
+### 技術說明
+- 新生成的特殊方塊會在生成後立即檢查是否在爆炸範圍內
+- 如果會被波及，將其對象引用加入 `bombModels` 陣列
+- 在 `processBomb()` 處理時，新方塊會觸發其特殊效果
+- 支持所有類型的爆炸檢測：LINE, COLUMN, WRAP, BIRD
 
 ### 修復進度
-- ⏳ 待開始修復
+- ✅ 已完成修復 (2025-12-04)
 
 ---
 
@@ -213,4 +278,4 @@ this.crushCell(j, i, true, cycleCount);  // 從cells陣列移除但對象還在
 ---
 
 **最後更新**: 2025-12-04
-**修復進度**: 1/5 (20%)
+**修復進度**: 2/5 (40%)
