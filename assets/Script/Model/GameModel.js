@@ -27,7 +27,8 @@ export default class GameModel {
     this.isStageTransitioning = false;                    // Bug #3 修復：是否正在階段轉換中
 
     this.totalCrushed = 0;                                // 記錄一輪要消除的數量
-    this.coin = 0;
+    this.coin = 0;                                        // 實際分數（邏輯層，立即計算）
+    this.displayCoin = 0;                                 // 顯示分數（視覺層，延遲更新）
     this.isProcessing = false;                            // 是否正在執行消除動畫
     this.isScoringComplete = true;                        // 分數計算是否完成（初始為true）
     this.currentHint = null;                              // 當前提示
@@ -372,17 +373,32 @@ export default class GameModel {
         let nextCheckPoint = this.down();
         let hasNextCrush = nextCheckPoint.length > 0;
 
-        setTimeout(() => {
-          this.earnCoinsByCrush(copyTotalCrushed);
-      
-          if (copyCycleCount > 1 && hasNextCrush) {
-              // 使用 comboLabel 而非 Toast
-              if (this.gameController) {
-                  this.gameController.showCombo(copyCycleCount);
-              }
-              this.earnCoinsByStep(copyCycleCount);
-          }
-        }, this.curTime * 1000);
+        // Bug #4 修復：分離邏輯和視覺
+        // 1. 立即計算實際分數（用於邏輯判斷和上傳）
+        // 2. 延遲更新顯示分數（配合動畫）
+
+        // 計算本次消除的分數
+        let crushEarn = this.calculateCrushEarn(copyTotalCrushed);
+        let stepEarn = 0;
+        if (copyCycleCount > 1 && hasNextCrush) {
+            stepEarn = 3 * Math.pow(copyCycleCount, 2);
+        }
+
+        // 立即更新實際分數（不更新顯示分數，displayCoin 會延遲更新）
+        this.earnCoin(crushEarn + stepEarn, false);
+
+        // 延遲更新顯示分數，配合動畫時間
+        let displayDelay = this.curTime * 1000;
+        this.updateDisplayCoin(crushEarn, displayDelay);
+        if (stepEarn > 0) {
+            // Combo 分數稍微延遲一點
+            this.updateDisplayCoin(stepEarn, displayDelay + 100);
+
+            // 使用 comboLabel 而非 Toast
+            if (this.gameController) {
+                this.gameController.showCombo(copyCycleCount);
+            }
+        }
 
         checkPoint = nextCheckPoint;
         cycleCount++;
@@ -390,11 +406,10 @@ export default class GameModel {
 
     this.isProcessing = false;
 
-    // 消除結束後，在分數計算完成後檢查是否達標和遊戲結束
-    setTimeout(() => {
-      this.isScoringComplete = true; // 標記分數計算完成
-      this.checkStageTargetReached();
-    }, (this.curTime + 0.5) * 1000);
+    // Bug #4 修復：分數已經在 while 循環中立即計算完成了
+    // 不需要延遲，直接標記為完成
+    this.isScoringComplete = true; // 標記分數計算完成
+    this.checkStageTargetReached();
 
     this.gameController.logicCalculateEnd();
   }
@@ -921,7 +936,8 @@ export default class GameModel {
     }
   }
 
-  earnCoinsByCrush(crushQuantity) {
+  calculateCrushEarn(crushQuantity) {
+    // 計算消除數量對應的分數，不實際修改分數
     let totalEarn = 0;
 
     if (crushQuantity >= 21)
@@ -939,6 +955,12 @@ export default class GameModel {
     else if (crushQuantity >= 3)
       totalEarn += 10;
 
+    return totalEarn;
+  }
+
+  earnCoinsByCrush(crushQuantity) {
+    // 保留這個方法以兼容其他可能的調用
+    let totalEarn = this.calculateCrushEarn(crushQuantity);
     this.earnCoin(totalEarn);
   }
 
@@ -954,7 +976,6 @@ export default class GameModel {
 
     // 如果分數計算尚未完成，延遲檢查
     if (this.isScoringComplete === false) {
-      console.log('分數計算尚未完成，延遲檢查遊戲結束');
       setTimeout(() => {
         this.checkEndGame();
       }, 100);
@@ -977,16 +998,14 @@ export default class GameModel {
 
   endGame() {
     this.isGameOver = true;
-    console.log("\n🏁 ========== 遊戲結束 ==========");
-    console.log(`最終分數：${this.coin}`);
-    console.log(`完成階段：${this.currentStage}`);
-    console.log("================================\n");
 
-    // 確保所有金幣計算完成
-    setTimeout(() => {
-      this.saveScoreToLeaderboard();
-      this.showLeaderboard();
-    }, 500); // 給予足夠時間確保金幣計算完成
+    // Bug #4 修復：分數在 processCrush 中已經立即計算完成
+    // 直接上傳分數並顯示排行榜
+    this.saveScoreToLeaderboard();
+    // saveScoreToLeaderboard 內部會：
+    // 1. 上傳分數到伺服器
+    // 2. 從伺服器獲取最新排行榜
+    // 3. 在 callback 中調用 showLeaderboard(true, true) 顯示排行榜
   }
 
   isEndGame() { return this.isGameOver; }
@@ -1000,7 +1019,8 @@ export default class GameModel {
     this.leftMovesToCoins(() => {
       // 在金幣轉換完成後保存分數並顯示排行榜
       this.saveScoreToLeaderboard();
-      this.showLeaderboard();
+      // Bug #4 修復：移除這裡的 showLeaderboard 調用
+      // saveScoreToLeaderboard 內部已經會在 callback 中調用 showLeaderboard(true, true)
     });
   }
 
@@ -1018,15 +1038,34 @@ export default class GameModel {
   }
 
   setCoin(amount) {
-    this.coin = Math.max(0, amount); // 避免負數
-    console.log(`金幣數量更新：${this.coin}`);
+    this.coin = Math.max(0, amount); // 避免負數（實際分數）
   }
+
   getCoin() {
+      // 返回顯示分數，用於 UI 顯示
+      return this.displayCoin;
+  }
+
+  getActualCoin() {
+      // 返回實際分數，用於邏輯判斷和上傳伺服器
       return this.coin;
   }
 
-  earnCoin(amount) {
-    this.setCoin(this.getCoin() + amount);
+  earnCoin(amount, updateDisplay = true) {
+    // 更新實際分數
+    this.setCoin(this.coin + amount);
+
+    // 默認也同步更新顯示分數（例如 leftMovesToCoins 時）
+    if (updateDisplay) {
+      this.displayCoin = Math.max(0, this.displayCoin + amount);
+    }
+  }
+
+  updateDisplayCoin(amount, delay) {
+    // 延遲更新顯示分數
+    setTimeout(() => {
+      this.displayCoin = Math.max(0, this.displayCoin + amount);
+    }, delay);
   }
 
   // ========== 階段系統方法 ==========
@@ -1332,23 +1371,21 @@ export default class GameModel {
         // 保存實例以便後續使用
         this.leaderboardManager = leaderboardManager;
         
-        console.log("正在上傳分數，玩家ID:", playerId, "分數:", this.coin);
-        
+        // 使用實際分數（而非顯示分數）上傳
+        let actualScore = this.getActualCoin();
+
         // 上傳分數到排行榜
-        leaderboardManager.addScore(playerId, this.coin, (err, result) => {
+        leaderboardManager.addScore(playerId, actualScore, (err) => {
             if (err) {
                 console.warn("上傳分數時出錯:", err.message);
                 Toast("上傳分數時出現問題，將使用本地排行榜", { duration: 2, gravity: "CENTER" });
-            } else {
-                console.log("分數上傳成功，排名:", result.rank);
             }
-            
-            // 無論成功與否，都顯示排行榜
-            // 注意：這裡不再調用 this.showLeaderboard()，而是直接調用 leaderboardManager.showLeaderboard()
-            // 這樣可以避免重複觸發排行榜加載流程
-            setTimeout(() => {
-                leaderboardManager.showLeaderboard(true); // 傳入一個參數表示這是從分數上傳後直接顯示的，避免重複提示
-            }, 500);
+
+            // Bug #4 修復：使用 addScore callback 中已獲取的最新數據
+            // addScore 內部已經呼叫 getLeaderboard 更新了 leaderboardData
+            // 傳入 skipLoadingToast=true, useCurrentData=true 直接使用該數據
+            // 避免 showLeaderboard 重複請求導致獲取舊數據
+            leaderboardManager.showLeaderboard(true, true);
         });
     } catch (e) {
         console.error("添加分數到排行榜時出錯:", e);
