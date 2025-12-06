@@ -43,7 +43,9 @@ cc.Class({
         const targetScore = this.gameModel.getCurrentStageTargetScore();
         const movesLeft = this.gameModel.movesLeft;
 
-        const isReached = this.gameModel.stageReachedTarget;
+        // Bug #7 修復：直接比較顯示分數和目標分數，不依賴 stageReachedTarget
+        // 這樣可以確保顏色變化和顯示分數同步
+        const isReached = targetScore !== null && currentScore >= targetScore;
 
         // 更新文字內容
         if (targetScore !== null) {

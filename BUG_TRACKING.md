@@ -683,13 +683,30 @@ endGame() {
 **推薦方案 1**：更直接，邏輯更清晰。
 
 ### 修改檔案
-（待實作）
+- ✅ `assets/Script/View/CoinView.js:46-48` - 修改顏色判斷邏輯，直接比較顯示分數
 
 ### 修復內容
-（待實作）
+採用方案 1，修改 `CoinView.js` 的 `updateDisplay()` 方法：
+
+```javascript
+// Bug #7 修復：直接比較顯示分數和目標分數，不依賴 stageReachedTarget
+// 這樣可以確保顏色變化和顯示分數同步
+const isReached = targetScore !== null && currentScore >= targetScore;
+```
+
+**修改前**：
+```javascript
+const isReached = this.gameModel.stageReachedTarget;
+```
+
+**修改後的邏輯**：
+- `currentScore` 來自 `this.gameModel.getCoin()`，返回的是 `displayCoin`（顯示分數）
+- 直接比較 `displayCoin >= targetScore` 來判斷是否達標
+- 顏色變化和顯示分數完全同步，不會提前變黃
 
 ### 修復進度
-- ⏳ 待開始修復（已回退，等待 Bug #5 測試完成）
+- ✅ 已完成修復 (2025-12-06)
+- ⏳ 待測試驗證
 
 ---
 
@@ -702,11 +719,11 @@ endGame() {
 2. **中優先級**（影響遊戲體驗）
    - ✅ Bug #3: 計時器異常倒數
    - ✅ Bug #4: 排行榜顯示舊數據
-   - ⏳ Bug #6: 遊戲結束後計時器繼續倒數
+   - 🧪 Bug #6: 遊戲結束後計時器繼續倒數（待測試）
 
 3. **低優先級**（視覺顯示問題）
    - 🧪 Bug #5: 分數顏色延遲更新（待測試）
-   - ⏳ Bug #7: 分數顏色提前變黃（雙分數系統副作用）
+   - 🧪 Bug #7: 分數顏色提前變黃（待測試）
 
 ---
 
