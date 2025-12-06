@@ -42,6 +42,7 @@ cc.Class({
         const currentScore = this.gameModel.getCoin();
         const targetScore = this.gameModel.getCurrentStageTargetScore();
         const movesLeft = this.gameModel.movesLeft;
+
         const isReached = this.gameModel.stageReachedTarget;
 
         // 更新文字內容

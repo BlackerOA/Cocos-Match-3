@@ -565,7 +565,7 @@ this.updateDisplayCoin(crushEarn, delay);  // 延遲更新 displayCoin
 
 ---
 
-## Bug #5: 第一階段達到第二階段目標，進入第二階段後分數顏色不立即變黃 ⏳
+## Bug #5: 第一階段達到第二階段目標，進入第二階段後分數顏色不立即變黃 ✅
 
 ### 問題描述
 如果第一階段就達到第二階段的目標（25000分）：
@@ -584,10 +584,24 @@ this.updateDisplayCoin(crushEarn, delay);  // 延遲更新 displayCoin
 在 `advanceToNextStage()` 中，重置 `stageReachedTarget` 後立即呼叫 `checkStageTargetReached()` 檢查當前分數是否已達標。
 
 ### 修改檔案
-- `assets/Script/Model/GameModel.js` - `advanceToNextStage()` 方法
+- ✅ `assets/Script/Model/GameModel.js:1139-1141` - 在 `advanceToNextStage()` 中添加立即檢查
+
+### 修復內容
+```javascript
+this.currentStage++;
+this.stageReachedTarget = false;
+
+const newConfig = this.getCurrentStageConfig();
+this.movesLeft = newConfig.steps; // 重置步數
+
+// Bug #5 修復：立即檢查當前分數是否已達新階段目標
+// 如果在前一階段就已經達到新階段的目標，顏色應該立即變黃
+this.checkStageTargetReached();
+```
 
 ### 修復進度
-- ⏳ 待開始修復
+- ✅ 已完成修復 (2025-12-05)
+- ⏳ 待使用者測試驗證（已回退 Bug #6 和 Bug #7，僅保留 Bug #5 修復）
 
 ---
 
@@ -597,19 +611,22 @@ this.updateDisplayCoin(crushEarn, delay);  // 延遲更新 displayCoin
 遊戲結束並顯示排行榜後，遊戲中的計時器（ThinkingTimer）還在繼續倒數。
 
 ### 根本原因
-在 `GameModel.js` 的 `saveScoreToLeaderboard()` 方法中：
-- 遊戲結束後會調用此方法上傳分數並顯示排行榜
+在 `GameModel.js` 的 `endGame()` 方法中：
+- 遊戲結束後會上傳分數並顯示排行榜
 - 但沒有停止計時器
 - 計時器會繼續倒數，直到時間耗盡
 
 ### 解決方案
-在 `saveScoreToLeaderboard()` 或遊戲結束流程中，明確停止計時器。
+在 `endGame()` 方法中，設置 `isGameOver = true` 後立即停止計時器。
 
 ### 修改檔案
-- `assets/Script/Model/GameModel.js` - `endGame()` 方法
+（待實作）
+
+### 修復內容
+（待實作）
 
 ### 修復進度
-- ⏳ 待開始修復
+- ⏳ 待開始修復（已回退，等待 Bug #5 測試完成）
 
 ---
 
@@ -653,32 +670,13 @@ this.updateDisplayCoin(crushEarn, delay);  // 延遲更新 displayCoin
 **推薦方案 1**：更直接，邏輯更清晰。
 
 ### 修改檔案
-- `assets/Script/View/CoinView.js` - `updateDisplay()` 方法
+（待實作）
+
+### 修復內容
+（待實作）
 
 ### 修復進度
-- ⏳ 待開始修復
-
-可能的修改位置：
-1. `GameModel.js` - `saveScoreToLeaderboard()` 方法開始時停止計時器
-2. `GameModel.js` - `checkEndGame()` 方法中判定遊戲結束時停止計時器
-
-### 修改檔案
-- ⏳ `assets/Script/Model/GameModel.js` - 遊戲結束流程
-- ⏳ `assets/Script/Controller/ThinkingTimer.js` - 可能需要確保停止方法正確
-
-### 技術說明
-需要確保以下時機停止計時器：
-1. 遊戲正常結束（步數用完且未達標）
-2. 排行榜顯示前
-3. 避免計時器在背景繼續運行
-
-建議使用：
-```javascript
-this.gameController.thinkingTimerScript.setWorkable(false);
-```
-
-### 修復進度
-- ⏳ 待開始修復 (2025-12-05)
+- ⏳ 待開始修復（已回退，等待 Bug #5 測試完成）
 
 ---
 
@@ -690,11 +688,12 @@ this.gameController.thinkingTimerScript.setWorkable(false);
 
 2. **中優先級**（影響遊戲體驗）
    - ✅ Bug #3: 計時器異常倒數
-   - 🔧 Bug #4: 排行榜顯示舊數據（修復中）
+   - ✅ Bug #4: 排行榜顯示舊數據
    - ⏳ Bug #6: 遊戲結束後計時器繼續倒數
 
 3. **低優先級**（視覺顯示問題）
-   - ⏳ Bug #5: 分數顏色延遲更新
+   - 🧪 Bug #5: 分數顏色延遲更新（待測試）
+   - ⏳ Bug #7: 分數顏色提前變黃（雙分數系統副作用）
 
 ---
 

@@ -1136,6 +1136,10 @@ export default class GameModel {
     console.log(`🎲 特殊方塊掉落率：${(newConfig.specialDropRate * 100).toFixed(0)}%`);
     console.log(`==========================================\n`);
 
+    // Bug #5 修復：立即檢查當前分數是否已達新階段目標
+    // 如果在前一階段就已經達到新階段的目標，顏色應該立即變黃
+    this.checkStageTargetReached();
+
     // 先確保計時器停止，然後重置數值到 15 秒
     if (this.gameController && this.gameController.thinkingTimerScript) {
       this.gameController.thinkingTimerScript.setWorkable(false); // 先停止
