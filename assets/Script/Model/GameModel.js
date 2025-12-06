@@ -999,6 +999,11 @@ export default class GameModel {
   endGame() {
     this.isGameOver = true;
 
+    // Bug #6 修復：停止計時器
+    if (this.gameController && this.gameController.thinkingTimerScript) {
+      this.gameController.thinkingTimerScript.setWorkable(false);
+    }
+
     // Bug #4 修復：分數在 processCrush 中已經立即計算完成
     // 直接上傳分數並顯示排行榜
     this.saveScoreToLeaderboard();

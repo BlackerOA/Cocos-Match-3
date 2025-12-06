@@ -104,7 +104,7 @@ export const STAGE_CONFIG = {
   },
   2: {
     stage: 2,
-    targetScore: 10001,    // 階段2目標分數（累計）
+    targetScore: 25000,    // 階段2目標分數（累計）
     steps: 15,             // 階段2步數
     specialDropRate: 0.02  // 2% 基礎掉落機率
   },

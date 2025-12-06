@@ -620,13 +620,26 @@ this.checkStageTargetReached();
 在 `endGame()` 方法中，設置 `isGameOver = true` 後立即停止計時器。
 
 ### 修改檔案
-（待實作）
+- ✅ `assets/Script/Model/GameModel.js:1002-1005` - 在 `endGame()` 中添加停止計時器邏輯
 
 ### 修復內容
-（待實作）
+```javascript
+endGame() {
+  this.isGameOver = true;
+
+  // Bug #6 修復：停止計時器
+  if (this.gameController && this.gameController.thinkingTimerScript) {
+    this.gameController.thinkingTimerScript.setWorkable(false);
+  }
+
+  // 上傳分數並顯示排行榜
+  this.saveScoreToLeaderboard();
+}
+```
 
 ### 修復進度
-- ⏳ 待開始修復（已回退，等待 Bug #5 測試完成）
+- ✅ 已完成修復 (2025-12-06)
+- ⏳ 待測試驗證
 
 ---
 
