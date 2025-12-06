@@ -369,6 +369,10 @@ export default class GameModel {
         let copyTotalCrushed = this.totalCrushed;
         let copyCycleCount = cycleCount;
 
+        // Bug #9 修復：在累加 curTime 之前計算 displayDelay
+        // 這樣 combo 顯示會在當前消除動畫時顯示，而不是延遲到下一個循環
+        let displayDelay = this.curTime * 1000;
+
         this.curTime += ANITIME.DIE;
         let nextCheckPoint = this.down();
         let hasNextCrush = nextCheckPoint.length > 0;
@@ -386,17 +390,17 @@ export default class GameModel {
 
         // 立即更新實際分數（不更新顯示分數，displayCoin 會延遲更新）
         this.earnCoin(crushEarn + stepEarn, false);
-
-        // 延遲更新顯示分數，配合動畫時間
-        let displayDelay = this.curTime * 1000;
         this.updateDisplayCoin(crushEarn, displayDelay);
         if (stepEarn > 0) {
             // Combo 分數稍微延遲一點
             this.updateDisplayCoin(stepEarn, displayDelay + 100);
 
-            // 使用 comboLabel 而非 Toast
-            if (this.gameController) {
-                this.gameController.showCombo(copyCycleCount);
+            // Bug #8 修復：延遲顯示 combo，且從 combo 2 開始才顯示
+            // 玩家第一次消除是 combo 1，不顯示
+            if (this.gameController && copyCycleCount >= 2) {
+                setTimeout(() => {
+                    this.gameController.showCombo(copyCycleCount);
+                }, displayDelay);
             }
         }
 

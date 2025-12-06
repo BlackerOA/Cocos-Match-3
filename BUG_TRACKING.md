@@ -710,6 +710,119 @@ const isReached = this.gameModel.stageReachedTarget;
 
 ---
 
+## Bug #8: Combo 數字立即顯示最終值 ✅
+
+### 問題描述
+玩家操作後，右上角顯示 combo 數的地方會直接顯示該次操作最後的 combo 數，例如進行一次消除操作後，上面直接寫 "combo 12!"。
+
+### 期望行為
+- 每一次連鎖消除 combo 會 +1
+- 從 combo 2 開始才顯示（玩家進行消除操作的那一次是 1，不顯示）
+- Combo 文字顏色規則不變
+
+### 根本原因
+在 `GameModel.js` 的 `processCrush` 方法中：
+- `showCombo(copyCycleCount)` 被立即調用，沒有延遲
+- `copyCycleCount` 是當前迴圈的最終 combo 數，所以立即顯示最終值
+- 沒有檢查 combo 數是否 >= 2，導致 combo 1 也會顯示
+
+### 解決方案
+1. 將 `showCombo` 的調用改為延遲執行，配合動畫時間（使用 `displayDelay`）
+2. 只有當 `copyCycleCount >= 2` 時才顯示 combo
+3. 這樣每次連鎖消除會在動畫播放時逐步顯示 combo 數
+
+### 修改檔案
+- ✅ `assets/Script/Model/GameModel.js:397-403` - 在 `processCrush` 中延遲顯示 combo
+
+### 修復內容
+```javascript
+// Bug #8 修復：延遲顯示 combo，且從 combo 2 開始才顯示
+// 玩家第一次消除是 combo 1，不顯示
+if (this.gameController && copyCycleCount >= 2) {
+    setTimeout(() => {
+        this.gameController.showCombo(copyCycleCount);
+    }, displayDelay);
+}
+```
+
+**修改前**：
+```javascript
+// 使用 comboLabel 而非 Toast
+if (this.gameController) {
+    this.gameController.showCombo(copyCycleCount);
+}
+```
+
+**修改後的邏輯**：
+- 使用 `setTimeout` 延遲 `displayDelay` 毫秒後顯示 combo
+- 只有 `copyCycleCount >= 2` 時才顯示（combo 1 不顯示）
+- 每次連鎖消除會在對應的動畫時間點顯示當前的 combo 數
+
+### 修復進度
+- ✅ 已完成修復 (2025-12-06)
+- ⏳ 待測試驗證
+
+---
+
+## Bug #9: Combo 顯示慢一拍 ✅
+
+### 問題描述
+Combo 顯示會慢一拍。具體表現：
+- 玩家消除後，連鎖消除的第一下結束後
+- 在進行連鎖消除的第二下時才跳出 "combo 2"
+- 但此時已經是第 3 個 combo 了
+
+### 根本原因
+在 `GameModel.js` 的 `processCrush` 方法中：
+- `this.curTime += ANITIME.DIE` 先累加時間
+- 然後才計算 `displayDelay = this.curTime * 1000`
+- 這導致使用的是**累加後**的時間，combo 會延遲到下一個循環才顯示
+
+**時間線問題**：
+```
+Combo 1: curTime = 0 → 累加後 = 0.2 → displayDelay = 200ms
+Combo 2: curTime = 0.2 → 累加後 = 0.4 → displayDelay = 400ms (慢一拍！)
+         實際應該在 200ms 顯示，但卻在 400ms 才顯示
+```
+
+### 解決方案
+在累加 `this.curTime` **之前**計算 `displayDelay`，這樣使用的是**當前循環開始時的時間**，而不是累加後的時間。
+
+### 修改檔案
+- ✅ `assets/Script/Model/GameModel.js:372-374` - 將 `displayDelay` 計算移到 `curTime` 累加之前
+
+### 修復內容
+```javascript
+// Bug #9 修復：在累加 curTime 之前計算 displayDelay
+// 這樣 combo 顯示會在當前消除動畫時顯示，而不是延遲到下一個循環
+let displayDelay = this.curTime * 1000;
+
+this.curTime += ANITIME.DIE;
+let nextCheckPoint = this.down();
+```
+
+**修改前**：
+```javascript
+this.curTime += ANITIME.DIE;
+let nextCheckPoint = this.down();
+let hasNextCrush = nextCheckPoint.length > 0;
+
+// ...
+
+let displayDelay = this.curTime * 1000;  // 使用累加後的時間（錯誤）
+```
+
+**修改後的邏輯**：
+- 先計算 `displayDelay`（使用當前時間）
+- 再累加 `this.curTime`
+- Combo 顯示時間與當前連鎖消除同步
+
+### 修復進度
+- ✅ 已完成修復 (2025-12-06)
+- ⏳ 待測試驗證
+
+---
+
 ## 修復優先級
 
 1. **高優先級**（影響遊戲邏輯）
@@ -724,6 +837,8 @@ const isReached = this.gameModel.stageReachedTarget;
 3. **低優先級**（視覺顯示問題）
    - 🧪 Bug #5: 分數顏色延遲更新（待測試）
    - 🧪 Bug #7: 分數顏色提前變黃（待測試）
+   - 🧪 Bug #8: Combo 數字立即顯示最終值（待測試）
+   - 🧪 Bug #9: Combo 顯示慢一拍（待測試）
 
 ---
 
