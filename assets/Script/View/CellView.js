@@ -77,6 +77,11 @@ cc.Class({
         if(cmd.length <= 0){
             return ;
         }
+
+        // 在執行動作前，先更新 sprite 和 arrow 顯示（重要！）
+        // 這確保了當 cell 交換位置時，外觀也會正確更新
+        this.updateSpriteAndArrow();
+
         var actionArray = [];
         var curTime = 0;
         let deathTime = 0;
@@ -141,8 +146,12 @@ cc.Class({
         var bg = this.node.getChildByName("select");
 
         if(flag == false && this.isSelect){
-            // 取消選擇時停止動畫並恢復原始狀態
-            this.node.stopAllActions();
+            // 取消選擇時只停止選擇動畫，不要停止移動動畫
+            // 我們通過保存選擇動畫的引用來只停止它
+            if (this.selectAction) {
+                this.node.stopAction(this.selectAction);
+                this.selectAction = null;
+            }
             this.node.scale = 1.0;
             this.updateSpriteAndArrow();
         }
@@ -381,13 +390,16 @@ cc.Class({
 
     // 點擊動畫（縮放效果）
     playClickAnimation: function() {
-        // 停止之前的動畫
-        this.node.stopAllActions();
+        // 停止之前的選擇動畫（如果存在）
+        if (this.selectAction) {
+            this.node.stopAction(this.selectAction);
+            this.selectAction = null;
+        }
 
         // 縮放動畫：放大到1.1倍再縮小到0.9倍，循環播放
         let scaleUp = cc.scaleTo(0.3, 1.1);
         let scaleDown = cc.scaleTo(0.3, 0.9);
         let sequence = cc.sequence(scaleUp, scaleDown);
-        this.node.runAction(cc.repeatForever(sequence));
+        this.selectAction = this.node.runAction(cc.repeatForever(sequence));
     }
 });
