@@ -1,4 +1,4 @@
-import {CELL_STATUS, CELL_WIDTH, CELL_HEIGHT, ANITIME} from '../Model/ConstValue';
+import {CELL_STATUS, CELL_WIDTH, CELL_HEIGHT, ANITIME, CELL_TYPE} from '../Model/ConstValue';
 
 cc.Class({
     extends: cc.Component,
@@ -7,33 +7,53 @@ cc.Class({
         defaultFrame:{
             default: null,
             type: cc.SpriteFrame
+        },
+        blueFrame:{
+            default: null,
+            type: cc.SpriteFrame
+        },
+        orangeFrame:{
+            default: null,
+            type: cc.SpriteFrame
         }
     },
 
     // use this for initialization
     onLoad: function () {
         this.isSelect = false;
-        
+
         // 創建一個用於提示效果的邊框節點
         this.hintBorder = new cc.Node("HintBorder");
         this.hintBorder.parent = this.node;
-        
+
         // 為邊框添加圖形組件
         let graphics = this.hintBorder.addComponent(cc.Graphics);
-        
+
         // 設置較寬的邊框線寬，使其更明顯
         graphics.lineWidth = 6;
-        
+
         // 使用鮮豔的紅色，在任何背景下都非常醒目
         graphics.strokeColor = cc.color(255, 0, 0, 255); // 鮮紅色
-        
+
         // 繪製略大於方塊的矩形
         const borderSize = Math.min(CELL_WIDTH, CELL_HEIGHT) - 8;
         graphics.rect(-borderSize/2, -borderSize/2, borderSize, borderSize);
         graphics.stroke();
-        
+
         // 初始時隱藏邊框
         this.hintBorder.active = false;
+
+        // 獲取 ArrowEffect 節點及其子節點引用
+        this.arrowEffect = this.node.getChildByName("ArrowEffect");
+        if (this.arrowEffect) {
+            this.arrowUp = this.arrowEffect.getChildByName("ArrowUp");
+            this.arrowDown = this.arrowEffect.getChildByName("ArrowDown");
+            this.arrowLeft = this.arrowEffect.getChildByName("ArrowLeft");
+            this.arrowRight = this.arrowEffect.getChildByName("ArrowRight");
+
+            // 初始化時隱藏所有箭頭
+            this.hideAllArrows();
+        }
     },
     
     initWithModel: function(model){
@@ -42,13 +62,9 @@ cc.Class({
         var y = model.startY;
         this.node.x = CELL_WIDTH * (x - 0.5);
         this.node.y = CELL_HEIGHT * (y - 0.5);
-        var animation  = this.node.getComponent(cc.Animation);
-        if (model.status == CELL_STATUS.COMMON){
-            animation.stop();
-        } 
-        else{
-            animation.play(model.status);
-        }
+
+        // 根據 status 更新 sprite 和 arrow 顯示
+        this.updateSpriteAndArrow();
     },
     
     setGridViewScript: function(gridViewScript) {
@@ -76,9 +92,7 @@ cc.Class({
                 actionArray.push(move);
             }
             else if(cmd[i].action == "toDie"){
-                if(this.status == CELL_STATUS.BIRD){
-                    let animation = this.node.getComponent(cc.Animation);
-                    animation.play("effect");
+                if(this.model.status == CELL_STATUS.BIRD){
                     actionArray.push(cc.delayTime(ANITIME.BOMB_BIRD_DELAY));
                     deathTime += ANITIME.BOMB_BIRD_DELAY;
                 }
@@ -124,19 +138,20 @@ cc.Class({
     },
 
     setSelect: function(flag){
-        var animation = this.node.getComponent(cc.Animation);
         var bg = this.node.getChildByName("select");
-        if(flag == false && this.isSelect && this.model.status == CELL_STATUS.COMMON){
-            animation.stop();
-            this.node.getComponent(cc.Sprite).spriteFrame = this.defaultFrame;
+
+        if(flag == false && this.isSelect){
+            // 取消選擇時停止動畫並恢復原始狀態
+            this.node.stopAllActions();
+            this.node.scale = 1.0;
+            this.updateSpriteAndArrow();
         }
-        else if(flag && this.model.status == CELL_STATUS.COMMON){
-            animation.play(CELL_STATUS.CLICK);
+        else if(flag){
+            // 選擇時播放縮放動畫
+            this.playClickAnimation();
         }
-        else if(flag && this.model.status == CELL_STATUS.BIRD){
-            animation.play(CELL_STATUS.CLICK);
-        }
-        bg.active = flag; 
+
+        bg.active = flag;
         this.isSelect = flag;
     },
 
@@ -198,5 +213,181 @@ cc.Class({
     // 替換舊的停止閃爍方法
     stopBlinking: function() {
         this.stopHintEffect();
+    },
+
+    // ==================== 水果 Sprite 切換和箭頭控制 ====================
+
+    // 更新 sprite 和箭頭顯示
+    updateSpriteAndArrow: function() {
+        if (!this.model) return;
+
+        let sprite = this.node.getComponent(cc.Sprite);
+        if (!sprite) return;
+
+        // 根據 status 切換 sprite frame
+        switch(this.model.status) {
+            case CELL_STATUS.COMMON:
+            case CELL_STATUS.CLICK:
+                // 一般狀態使用 defaultFrame
+                sprite.spriteFrame = this.defaultFrame;
+                this.hideAllArrows();
+                break;
+
+            case CELL_STATUS.LINE:
+            case CELL_STATUS.COLUMN:
+                // 直線狀態使用藍色 frame
+                sprite.spriteFrame = this.blueFrame;
+                this.showArrowsForStatus(this.model.status);
+                break;
+
+            case CELL_STATUS.WRAP:
+                // 爆炸狀態使用橘色 frame
+                sprite.spriteFrame = this.orangeFrame;
+                this.showArrowsForStatus(this.model.status);
+                break;
+
+            case CELL_STATUS.BIRD:
+                // BIRD 狀態使用 defaultFrame（榴槤沒有藍框橘框版本）
+                sprite.spriteFrame = this.defaultFrame;
+                this.hideAllArrows();
+                break;
+
+            default:
+                sprite.spriteFrame = this.defaultFrame;
+                this.hideAllArrows();
+                break;
+        }
+    },
+
+    // 根據 status 顯示對應箭頭
+    showArrowsForStatus: function(status) {
+        this.hideAllArrows();
+
+        if (!this.arrowEffect) return;
+
+        switch(status) {
+            case CELL_STATUS.LINE:
+                // 橫向直線：顯示左右箭頭
+                this.playHorizontalArrowAnimation();
+                break;
+
+            case CELL_STATUS.COLUMN:
+                // 縱向直線：顯示上下箭頭
+                this.playVerticalArrowAnimation();
+                break;
+
+            case CELL_STATUS.WRAP:
+                // 爆炸：顯示四個方向箭頭
+                this.playWrapArrowAnimation();
+                break;
+        }
+    },
+
+    // 隱藏所有箭頭
+    hideAllArrows: function() {
+        if (!this.arrowEffect) return;
+
+        if (this.arrowUp) {
+            this.arrowUp.stopAllActions();
+            this.arrowUp.active = false;
+        }
+        if (this.arrowDown) {
+            this.arrowDown.stopAllActions();
+            this.arrowDown.active = false;
+        }
+        if (this.arrowLeft) {
+            this.arrowLeft.stopAllActions();
+            this.arrowLeft.active = false;
+        }
+        if (this.arrowRight) {
+            this.arrowRight.stopAllActions();
+            this.arrowRight.active = false;
+        }
+    },
+
+    // 橫向箭頭動畫（左右箭頭向外移動）
+    playHorizontalArrowAnimation: function() {
+        if (!this.arrowLeft || !this.arrowRight) return;
+
+        this.arrowLeft.active = true;
+        this.arrowRight.active = true;
+
+        // 左箭頭：向左移動再回來
+        let leftMoveOut = cc.moveBy(0.5, cc.v2(-10, 0));
+        let leftMoveIn = cc.moveBy(0.5, cc.v2(10, 0));
+        let leftSequence = cc.sequence(leftMoveOut, leftMoveIn);
+        this.arrowLeft.runAction(cc.repeatForever(leftSequence));
+
+        // 右箭頭：向右移動再回來
+        let rightMoveOut = cc.moveBy(0.5, cc.v2(10, 0));
+        let rightMoveIn = cc.moveBy(0.5, cc.v2(-10, 0));
+        let rightSequence = cc.sequence(rightMoveOut, rightMoveIn);
+        this.arrowRight.runAction(cc.repeatForever(rightSequence));
+    },
+
+    // 縱向箭頭動畫（上下箭頭向外移動）
+    playVerticalArrowAnimation: function() {
+        if (!this.arrowUp || !this.arrowDown) return;
+
+        this.arrowUp.active = true;
+        this.arrowDown.active = true;
+
+        // 上箭頭：向上移動再回來
+        let upMoveOut = cc.moveBy(0.5, cc.v2(0, 10));
+        let upMoveIn = cc.moveBy(0.5, cc.v2(0, -10));
+        let upSequence = cc.sequence(upMoveOut, upMoveIn);
+        this.arrowUp.runAction(cc.repeatForever(upSequence));
+
+        // 下箭頭：向下移動再回來
+        let downMoveOut = cc.moveBy(0.5, cc.v2(0, -10));
+        let downMoveIn = cc.moveBy(0.5, cc.v2(0, 10));
+        let downSequence = cc.sequence(downMoveOut, downMoveIn);
+        this.arrowDown.runAction(cc.repeatForever(downSequence));
+    },
+
+    // 爆炸箭頭動畫（四個方向箭頭向外移動）
+    playWrapArrowAnimation: function() {
+        if (!this.arrowUp || !this.arrowDown || !this.arrowLeft || !this.arrowRight) return;
+
+        this.arrowUp.active = true;
+        this.arrowDown.active = true;
+        this.arrowLeft.active = true;
+        this.arrowRight.active = true;
+
+        // 上箭頭：向上移動再回來
+        let upMoveOut = cc.moveBy(0.5, cc.v2(0, 10));
+        let upMoveIn = cc.moveBy(0.5, cc.v2(0, -10));
+        let upSequence = cc.sequence(upMoveOut, upMoveIn);
+        this.arrowUp.runAction(cc.repeatForever(upSequence));
+
+        // 下箭頭：向下移動再回來
+        let downMoveOut = cc.moveBy(0.5, cc.v2(0, -10));
+        let downMoveIn = cc.moveBy(0.5, cc.v2(0, 10));
+        let downSequence = cc.sequence(downMoveOut, downMoveIn);
+        this.arrowDown.runAction(cc.repeatForever(downSequence));
+
+        // 左箭頭：向左移動再回來
+        let leftMoveOut = cc.moveBy(0.5, cc.v2(-10, 0));
+        let leftMoveIn = cc.moveBy(0.5, cc.v2(10, 0));
+        let leftSequence = cc.sequence(leftMoveOut, leftMoveIn);
+        this.arrowLeft.runAction(cc.repeatForever(leftSequence));
+
+        // 右箭頭：向右移動再回來
+        let rightMoveOut = cc.moveBy(0.5, cc.v2(10, 0));
+        let rightMoveIn = cc.moveBy(0.5, cc.v2(-10, 0));
+        let rightSequence = cc.sequence(rightMoveOut, rightMoveIn);
+        this.arrowRight.runAction(cc.repeatForever(rightSequence));
+    },
+
+    // 點擊動畫（縮放效果）
+    playClickAnimation: function() {
+        // 停止之前的動畫
+        this.node.stopAllActions();
+
+        // 縮放動畫：放大到1.1倍再縮小到0.9倍，循環播放
+        let scaleUp = cc.scaleTo(0.3, 1.1);
+        let scaleDown = cc.scaleTo(0.3, 0.9);
+        let sequence = cc.sequence(scaleUp, scaleDown);
+        this.node.runAction(cc.repeatForever(sequence));
     }
 });
