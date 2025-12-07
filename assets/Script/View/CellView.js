@@ -97,10 +97,8 @@ cc.Class({
                 actionArray.push(move);
             }
             else if(cmd[i].action == "toDie"){
-                if(this.model.status == CELL_STATUS.BIRD){
-                    actionArray.push(cc.delayTime(ANITIME.BOMB_BIRD_DELAY));
-                    deathTime += ANITIME.BOMB_BIRD_DELAY;
-                }
+                // 所有水果（包括榴槤）都使用相同的消除邏輯
+                // 搖晃動畫由 "toShake" 命令處理，這裡只負責銷毀節點
                 var callFunc = cc.callFunc(function(){
                     this.node.destroy();
                 },this);
