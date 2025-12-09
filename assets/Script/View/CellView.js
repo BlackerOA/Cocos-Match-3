@@ -48,6 +48,13 @@ cc.Class({
             this.hideAllArrows();
             this.hideBombIcon();
         }
+
+        // 獲取榴槤粒子特效節點引用
+        this.particleEffect = this.node.getChildByName("ParticleEffect");
+        if (this.particleEffect) {
+            // 初始化時停止粒子效果
+            this.stopParticleEffect();
+        }
     },
 
     initWithModel: function(model){
@@ -228,9 +235,10 @@ cc.Class({
         // 所有狀態都使用 defaultFrame，保持原本水果外觀
         sprite.spriteFrame = this.defaultFrame;
 
-        // 先隱藏所有箭頭和炸彈
+        // 先隱藏所有箭頭、炸彈和粒子效果
         this.hideAllArrows();
         this.hideBombIcon();
+        this.stopParticleEffect();
 
         // 根據 status 顯示對應的圖標
         switch(this.model.status) {
@@ -249,9 +257,13 @@ cc.Class({
                 this.showBombIcon();
                 break;
 
+            case CELL_STATUS.BIRD:
+                // 榴槤：顯示粒子特效
+                this.playParticleEffect();
+                break;
+
             case CELL_STATUS.COMMON:
             case CELL_STATUS.CLICK:
-            case CELL_STATUS.BIRD:
             default:
                 // 其他狀態不顯示任何圖標
                 break;
@@ -389,5 +401,29 @@ cc.Class({
         let scaleDown = cc.scaleTo(0.5, 0.9);
         let sequence = cc.sequence(scaleUp, scaleDown);
         this.bombIcon.runAction(cc.repeatForever(sequence));
+    },
+
+    // ==================== 榴槤粒子特效控制 ====================
+
+    // 播放粒子特效
+    playParticleEffect: function() {
+        if (!this.particleEffect) return;
+
+        let particleSystem = this.particleEffect.getComponent(cc.ParticleSystem);
+        if (particleSystem) {
+            this.particleEffect.active = true;
+            particleSystem.resetSystem();  // 重置粒子系統
+        }
+    },
+
+    // 停止粒子特效
+    stopParticleEffect: function() {
+        if (!this.particleEffect) return;
+
+        let particleSystem = this.particleEffect.getComponent(cc.ParticleSystem);
+        if (particleSystem) {
+            particleSystem.stopSystem();  // 停止發射新粒子
+            this.particleEffect.active = false;
+        }
     }
 });
