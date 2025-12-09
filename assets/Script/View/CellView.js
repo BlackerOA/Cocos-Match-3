@@ -7,14 +7,6 @@ cc.Class({
         defaultFrame:{
             default: null,
             type: cc.SpriteFrame
-        },
-        blueFrame:{
-            default: null,
-            type: cc.SpriteFrame
-        },
-        orangeFrame:{
-            default: null,
-            type: cc.SpriteFrame
         }
     },
 
@@ -50,12 +42,14 @@ cc.Class({
             this.arrowDown = this.arrowEffect.getChildByName("ArrowDown");
             this.arrowLeft = this.arrowEffect.getChildByName("ArrowLeft");
             this.arrowRight = this.arrowEffect.getChildByName("ArrowRight");
+            this.bombIcon = this.arrowEffect.getChildByName("Bomb");
 
-            // 初始化時隱藏所有箭頭
+            // 初始化時隱藏所有箭頭和炸彈
             this.hideAllArrows();
+            this.hideBombIcon();
         }
     },
-    
+
     initWithModel: function(model){
         this.model = model;
         var x = model.startX;
@@ -231,48 +225,15 @@ cc.Class({
         let sprite = this.node.getComponent(cc.Sprite);
         if (!sprite) return;
 
-        // 根據 status 切換 sprite frame
-        switch(this.model.status) {
-            case CELL_STATUS.COMMON:
-            case CELL_STATUS.CLICK:
-                // 一般狀態使用 defaultFrame
-                sprite.spriteFrame = this.defaultFrame;
-                this.hideAllArrows();
-                break;
+        // 所有狀態都使用 defaultFrame，保持原本水果外觀
+        sprite.spriteFrame = this.defaultFrame;
 
-            case CELL_STATUS.LINE:
-            case CELL_STATUS.COLUMN:
-                // 直線狀態使用藍色 frame
-                sprite.spriteFrame = this.blueFrame;
-                this.showArrowsForStatus(this.model.status);
-                break;
-
-            case CELL_STATUS.WRAP:
-                // 爆炸狀態使用橘色 frame
-                sprite.spriteFrame = this.orangeFrame;
-                this.showArrowsForStatus(this.model.status);
-                break;
-
-            case CELL_STATUS.BIRD:
-                // BIRD 狀態使用 defaultFrame（榴槤沒有藍框橘框版本）
-                sprite.spriteFrame = this.defaultFrame;
-                this.hideAllArrows();
-                break;
-
-            default:
-                sprite.spriteFrame = this.defaultFrame;
-                this.hideAllArrows();
-                break;
-        }
-    },
-
-    // 根據 status 顯示對應箭頭
-    showArrowsForStatus: function(status) {
+        // 先隱藏所有箭頭和炸彈
         this.hideAllArrows();
+        this.hideBombIcon();
 
-        if (!this.arrowEffect) return;
-
-        switch(status) {
+        // 根據 status 顯示對應的圖標
+        switch(this.model.status) {
             case CELL_STATUS.LINE:
                 // 橫向直線：顯示左右箭頭
                 this.playHorizontalArrowAnimation();
@@ -284,8 +245,15 @@ cc.Class({
                 break;
 
             case CELL_STATUS.WRAP:
-                // 爆炸：顯示四個方向箭頭
-                this.playWrapArrowAnimation();
+                // 爆炸：顯示炸彈圖標
+                this.showBombIcon();
+                break;
+
+            case CELL_STATUS.COMMON:
+            case CELL_STATUS.CLICK:
+            case CELL_STATUS.BIRD:
+            default:
+                // 其他狀態不顯示任何圖標
                 break;
         }
     },
@@ -399,5 +367,27 @@ cc.Class({
         let scaleDown = cc.scaleTo(0.3, 0.9);
         let sequence = cc.sequence(scaleUp, scaleDown);
         this.selectAction = this.node.runAction(cc.repeatForever(sequence));
+    },
+
+    // ==================== 炸彈圖標控制 ====================
+
+    // 隱藏炸彈圖標
+    hideBombIcon: function() {
+        if (this.bombIcon) {
+            this.bombIcon.stopAllActions();
+            this.bombIcon.active = false;
+        }
+    },
+
+    // 顯示炸彈圖標並播放縮放動畫
+    showBombIcon: function() {
+        if (!this.bombIcon) return;
+        this.bombIcon.active = true;
+
+        // 縮放動畫：放大縮小循環
+        let scaleUp = cc.scaleTo(0.5, 1.2);
+        let scaleDown = cc.scaleTo(0.5, 0.9);
+        let sequence = cc.sequence(scaleUp, scaleDown);
+        this.bombIcon.runAction(cc.repeatForever(sequence));
     }
 });

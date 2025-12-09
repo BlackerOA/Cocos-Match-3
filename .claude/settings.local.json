@@ -5,7 +5,8 @@
       "Bash(tree:*)",
       "Bash(git checkout:*)",
       "Bash(find:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(powershell -Command \"Get-Item bomb.png | Select-Object Name, Length\")"
     ],
     "deny": [],
     "ask": []
