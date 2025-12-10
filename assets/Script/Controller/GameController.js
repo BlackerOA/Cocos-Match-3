@@ -13,7 +13,17 @@ cc.Class({
         default: null,
         type: cc.Node
     },
-    audioSource: { 
+    soundIcon: {
+        default: null,
+        type: cc.SpriteFrame,
+        tooltip: "音樂播放圖標"
+    },
+    muteIcon: {
+        default: null,
+        type: cc.SpriteFrame,
+        tooltip: "音樂靜音圖標"
+    },
+    audioSource: {
         default: null, // 設置默認值
         type: cc.AudioSource
     },
@@ -83,8 +93,33 @@ cc.Class({
 
   callback: function () {
     let state = this.audioSource._state;
-    state === 1 ? this.audioSource.pause() : this.audioSource.play()
-    Toast(state === 1 ? '关闭背景音乐🎵' : '打开背景音乐🎵' )
+    let isPausing = state === 1; // true 表示目前正在播放，即將暫停
+
+    // 切換音頻狀態
+    isPausing ? this.audioSource.pause() : this.audioSource.play();
+
+    // 切換按鈕圖片
+    let audioButton = this.node.parent.getChildByName('audioButton');
+    if (audioButton) {
+      let buttonComponent = audioButton.getComponent(cc.Button);
+      let background = audioButton.getChildByName('Background');
+
+      if (background && buttonComponent) {
+        let sprite = background.getComponent(cc.Sprite);
+        if (sprite) {
+          // isPausing 為 true 表示正在暫停音樂，顯示 mute 圖標
+          // isPausing 為 false 表示正在播放音樂，顯示 sound 圖標
+          let targetIcon = isPausing ? this.muteIcon : this.soundIcon;
+
+          // 同時更新 Sprite 和 Button 的 normalSprite
+          sprite.spriteFrame = targetIcon;
+          buttonComponent.normalSprite = targetIcon;
+        }
+      }
+    }
+
+    // 顯示 Toast
+    Toast(isPausing ? '關閉背景音樂🎵' : '打開背景音樂🎵');
   },
 
   selectCell: function (pos) {

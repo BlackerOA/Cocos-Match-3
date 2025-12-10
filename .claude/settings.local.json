@@ -7,7 +7,9 @@
       "Bash(find:*)",
       "Bash(ls:*)",
       "Bash(powershell -Command \"Get-Item bomb.png | Select-Object Name, Length\")",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(powershell -Command \"Get-Content assets/Scene/Game.fire | Select-String -Pattern ''audioButton|soundIcon|muteIcon'' -Context 2,2\")",
+      "Bash(powershell:*)"
     ],
     "deny": [],
     "ask": []
