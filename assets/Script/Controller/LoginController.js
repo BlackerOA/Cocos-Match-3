@@ -1,4 +1,5 @@
 import AudioUtils from "../Utils/AudioUtils";
+import GlobalAudioManager from "../Utils/GlobalAudioManager";
 const GlobalData = require("../Utils/GlobalData");
 const Toast = require("../Utils/Toast");
 
@@ -30,10 +31,26 @@ cc.Class({
       type: cc.Button,
       default: null,
     },
+    audioButton: {
+      type: cc.Button,
+      default: null,
+      tooltip: "音樂控制按鈕"
+    },
+    soundIcon: {
+      default: null,
+      type: cc.SpriteFrame,
+      tooltip: "音樂播放圖標"
+    },
+    muteIcon: {
+      default: null,
+      type: cc.SpriteFrame,
+      tooltip: "音樂靜音圖標"
+    },
   },
 
   onLoad() {
-    this.gameSceneBGMAudioId = cc.audioEngine.play(this.worldSceneBGM, true, 1);
+    // 使用全局音頻管理器播放Login場景的背景音樂
+    GlobalAudioManager.playBGM('Login', this.worldSceneBGM, true, 1);
     
     // 設置登錄按鈕事件
     if (this.loginButton) {
@@ -59,9 +76,51 @@ cc.Class({
       this.HowToPlayButton.node.on('click', this.onHowToPlayClick, this);
     }
 
+    // 設置音頻按鈕事件
+    if (this.audioButton) {
+      this.audioButton.node.on('click', this.onAudioButtonClick, this);
+      // 更新音頻按鈕圖標為當前狀態
+      this.updateAudioButtonIcon();
+    }
+
     // 設置玩家ID輸入框的最大長度
     if (this.playerIdInput) {
       this.playerIdInput.maxLength = 20;
+    }
+  },
+
+  /**
+   * 音頻按鈕點擊事件
+   */
+  onAudioButtonClick: function() {
+    // 使用全局音頻管理器切換Login場景的靜音狀態
+    const isMuted = GlobalAudioManager.toggleMute('Login');
+
+    // 更新按鈕圖標
+    this.updateAudioButtonIcon();
+
+    // 顯示 Toast
+    Toast(isMuted ? '關閉背景音樂🎵' : '打開背景音樂🎵');
+  },
+
+  /**
+   * 更新音頻按鈕圖標
+   */
+  updateAudioButtonIcon: function() {
+    if (!this.audioButton) return;
+
+    let background = this.audioButton.node.getChildByName('Background');
+
+    if (background) {
+      let sprite = background.getComponent(cc.Sprite);
+      if (sprite && this.soundIcon && this.muteIcon) {
+        // 根據Login場景的靜音狀態選擇圖標
+        let targetIcon = GlobalAudioManager.isMuted('Login') ? this.muteIcon : this.soundIcon;
+
+        // 同時更新 Sprite 和 Button 的 normalSprite
+        sprite.spriteFrame = targetIcon;
+        this.audioButton.normalSprite = targetIcon;
+      }
     }
   },
   
@@ -156,7 +215,8 @@ cc.Class({
   },
 
   onDestroy: function () {
-    cc.audioEngine.stop(this.gameSceneBGMAudioId);
+    // 不需要停止音樂，因為使用全局管理器，音樂會跨場景保持
+    // GlobalAudioManager 會自動處理
   },
 
   onHowToPlayClick() {

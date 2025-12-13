@@ -958,6 +958,9 @@
       "__uuid__": "b14af572-5b0f-461a-b910-fdfcdc206a09"
     },
     "audioSource": null,
+    "gameSceneBGM": {
+      "__uuid__": "f0bbf861-9d72-4734-b012-26ba8614bf11"
+    },
     "hintTimer": {
       "__id__": 17
     },
@@ -1444,7 +1447,7 @@
     "node": {
       "__id__": 5
     },
-    "_enabled": true,
+    "_enabled": false,
     "_clip": {
       "__uuid__": "f0bbf861-9d72-4734-b012-26ba8614bf11"
     },

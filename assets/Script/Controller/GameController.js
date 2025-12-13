@@ -1,5 +1,6 @@
 import GameModel from "../Model/GameModel";
 import Toast from '../Utils/Toast';
+import GlobalAudioManager from '../Utils/GlobalAudioManager';
 
 cc.Class({
   extends: cc.Component,
@@ -24,8 +25,13 @@ cc.Class({
         tooltip: "音樂靜音圖標"
     },
     audioSource: {
-        default: null, // 設置默認值
+        default: null,
         type: cc.AudioSource
+    },
+    gameSceneBGM: {
+        default: null,
+        type: cc.AudioClip,
+        tooltip: "遊戲場景背景音樂"
     },
     hintTimer: {
       default: null,
@@ -44,14 +50,16 @@ cc.Class({
 
   // use this for initialization
   onLoad: function () {
-    if (!this.audioSource) {
-      this.audioSource = cc.find("Canvas/AudioSource").getComponent(cc.AudioSource);
-    }
     if (!this.thinkingTimer) {
       this.thinkingTimer = cc.find("Canvas/ThinkingTimeLabel");
     }
     if (!this.comboLabel) {
       this.comboLabel = cc.find("Canvas/ComboLabel");
+    }
+
+    // 使用全局音頻管理器播放Game場景的背景音樂
+    if (this.gameSceneBGM) {
+      GlobalAudioManager.playBGM('Game', this.gameSceneBGM, true, 1);
     }
 
     let audioButton = this.node.parent.getChildByName('audioButton')
@@ -62,7 +70,6 @@ cc.Class({
     this.gridScript = this.grid.getComponent("GridView");
     this.gridScript.setController(this);
     this.gridScript.initWithCellModels(this.gameModel.getCells());
-    this.audioSource = cc.find('Canvas/GameScene')._components[1].audio;
     this.hintTimerScript = this.hintTimer.getComponent("HintTimer");
     this.hintTimerScript.setGameController(this);
     this.thinkingTimerScript = this.thinkingTimer.getComponent("ThinkingTimer");
@@ -76,6 +83,9 @@ cc.Class({
         this.comboLabel.opacity = 0;  // 初始時隱藏
       }
     }
+
+    // 更新音頻按鈕圖標為當前狀態
+    this.updateAudioButtonIcon();
   },
 
   start: function() {
@@ -92,34 +102,37 @@ cc.Class({
   },
 
   callback: function () {
-    let state = this.audioSource._state;
-    let isPausing = state === 1; // true 表示目前正在播放，即將暫停
+    // 使用全局音頻管理器切換Game場景的靜音狀態
+    const isMuted = GlobalAudioManager.toggleMute('Game');
 
-    // 切換音頻狀態
-    isPausing ? this.audioSource.pause() : this.audioSource.play();
-
-    // 切換按鈕圖片
-    let audioButton = this.node.parent.getChildByName('audioButton');
-    if (audioButton) {
-      let buttonComponent = audioButton.getComponent(cc.Button);
-      let background = audioButton.getChildByName('Background');
-
-      if (background && buttonComponent) {
-        let sprite = background.getComponent(cc.Sprite);
-        if (sprite) {
-          // isPausing 為 true 表示正在暫停音樂，顯示 mute 圖標
-          // isPausing 為 false 表示正在播放音樂，顯示 sound 圖標
-          let targetIcon = isPausing ? this.muteIcon : this.soundIcon;
-
-          // 同時更新 Sprite 和 Button 的 normalSprite
-          sprite.spriteFrame = targetIcon;
-          buttonComponent.normalSprite = targetIcon;
-        }
-      }
-    }
+    // 更新按鈕圖標
+    this.updateAudioButtonIcon();
 
     // 顯示 Toast
-    Toast(isPausing ? '關閉背景音樂🎵' : '打開背景音樂🎵');
+    Toast(isMuted ? '關閉背景音樂🎵' : '打開背景音樂🎵');
+  },
+
+  /**
+   * 更新音頻按鈕圖標
+   */
+  updateAudioButtonIcon: function() {
+    let audioButton = this.node.parent.getChildByName('audioButton');
+    if (!audioButton) return;
+
+    let buttonComponent = audioButton.getComponent(cc.Button);
+    let background = audioButton.getChildByName('Background');
+
+    if (background && buttonComponent) {
+      let sprite = background.getComponent(cc.Sprite);
+      if (sprite) {
+        // 根據Game場景的靜音狀態選擇圖標
+        let targetIcon = GlobalAudioManager.isMuted('Game') ? this.muteIcon : this.soundIcon;
+
+        // 同時更新 Sprite 和 Button 的 normalSprite
+        sprite.spriteFrame = targetIcon;
+        buttonComponent.normalSprite = targetIcon;
+      }
+    }
   },
 
   selectCell: function (pos) {
